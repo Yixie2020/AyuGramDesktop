@@ -116,6 +116,12 @@ public:
 	void elementShowTooltip(
 		const TextWithEntities &text,
 		Fn<void()> hiddenCallback) override;
+	bool elementScrollToLocalY(
+		gsl::not_null<const HistoryView::Element*> view,
+		int localY) override;
+	void elementShowHiddenSenderTooltip(
+		FullMsgId context,
+		const TextWithEntities &text) override;
 	bool elementAnimationsPaused() override;
 	bool elementHideReply(
 		not_null<const HistoryView::Element*> view) override;

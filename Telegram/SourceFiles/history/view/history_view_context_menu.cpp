@@ -952,7 +952,7 @@ bool AddDeleteMessageAction(
 					nullptr,
 					opt));
 			} else {
-				controller->show(Box<DeleteMessagesBox>(item));
+				controller->show(Box<DeleteMessagesBox>(item, false));
 			}
 		}
 	});

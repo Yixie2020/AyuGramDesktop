@@ -11,6 +11,8 @@
 #include "lang/lang_text_entity.h"
 #include "settings/settings_common.h"
 #include "styles/style_ayu_styles.h"
+#include "styles/style_boxes.h"
+#include "styles/style_edit_peer_members.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
@@ -297,7 +299,6 @@ not_null<Ui::RpWidget*> AddInnerToggle(not_null<Ui::VerticalLayout*> container,
 											   anim::easeOutCubic);
 									   },
 									   button->lifetime());
-	wrap->ease = anim::easeOutCubic;
 
 	button->clicks(
 	) | on_next([=]

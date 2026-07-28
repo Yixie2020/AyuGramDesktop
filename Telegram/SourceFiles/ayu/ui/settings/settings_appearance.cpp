@@ -8,7 +8,6 @@
 
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
-#include "ayu/ayu_ui_settings.h"
 #include "ayu/ui/boxes/font_selector.h"
 #include "ayu/ui/components/avatar_corners_preview.h"
 #include "ayu/ui/components/icon_picker.h"
@@ -89,7 +88,7 @@ void BuildAvatarCorners(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	{
 		if (val == 0) {
 			return tr::ayu_AvatarCornersSquare(tr::now).toUpper();
-		} else if (val == AyuUiSettings::kMaxAvatarCorners) {
+		} else if (val == 23) {
 			return tr::ayu_AvatarCornersCircle(tr::now).toUpper();
 		}
 		return QString::number(val);
@@ -159,7 +158,7 @@ void BuildAvatarCorners(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.id = u"ayu/avatarCornersSlider"_q,
 		.title = rpl::single(QString()),
 		.showTitle = false,
-		.steps = AyuUiSettings::kMaxAvatarCorners + 1,
+		.steps = 24,
 		.current = settings->avatarCorners(),
 		.onChanged = [=](int val) {
 			AyuSettings::getInstance().setAvatarCorners(val);

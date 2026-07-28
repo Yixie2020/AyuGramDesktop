@@ -800,7 +800,7 @@ void ScheduledWidget::edit(
 		&& item->media()->allowsEditCaption();
 	if (sending.text.isEmpty() && !hasMediaWithCaption) {
 		if (item) {
-			controller()->show(Box<DeleteMessagesBox>(item));
+			controller()->show(Box<DeleteMessagesBox>(item, false));
 		} else {
 			_composeControls->focus();
 		}

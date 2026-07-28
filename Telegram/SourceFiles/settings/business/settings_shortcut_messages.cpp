@@ -1240,7 +1240,7 @@ void ShortcutMessages::edit(
 	if (!TextUtilities::CutPart(sending, left, maxTextSize)
 		&& !hasMediaWithCaption) {
 		if (item) {
-			_controller->show(Box<DeleteMessagesBox>(item));
+			_controller->show(Box<DeleteMessagesBox>(item, false));
 		} else {
 			doSetInnerFocus();
 		}

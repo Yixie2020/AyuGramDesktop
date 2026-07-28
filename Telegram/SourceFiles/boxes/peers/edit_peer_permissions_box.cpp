@@ -551,7 +551,6 @@ not_null<Ui::RpWidget*> AddInnerToggle(
 			st::slideWrapDuration,
 			anim::easeOutCubic);
 	}, button->lifetime());
-	wrap->ease = anim::easeOutCubic;
 
 	const auto handleLocked = [=] {
 		if (locked.has_value()) {

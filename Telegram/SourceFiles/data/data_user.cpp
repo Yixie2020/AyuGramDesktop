@@ -1111,3 +1111,7 @@ Ui::BotVerifyDetails ParseBotVerifyDetails(const MTPBotVerification *info) {
 }
 
 } // namespace Data
+
+bool UserData::isAyuNoForwards() const {
+	return false;
+}

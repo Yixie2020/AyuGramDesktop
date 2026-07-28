@@ -654,7 +654,6 @@ void BottomInfo::layoutDateText() {
 			Ui::NameTextOptions(),
 			helper.context());
 	}
-	}
 }
 
 void BottomInfo::layoutViewsText() {
@@ -764,7 +763,7 @@ QRect BottomInfo::effectIconGeometry() const {
 		st::effectInfoImage);
 }
 
-BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
+struct BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	using Flag = BottomInfo::Data::Flag;
 	const auto item = message->data();
 

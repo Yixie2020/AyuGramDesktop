@@ -8,7 +8,6 @@
 
 #include "lang_auto.h"
 #include "tray.h"
-#include "ayu/ayu_ui_settings.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/ui/ayu_logo.h"
 #include "core/application.h"
@@ -517,7 +516,7 @@ void AyuSettings::validate() {
 	validateRange(_messageBubbleRadius, 0, 16, defaults._messageBubbleRadius);
 	validateRange(_wideMultiplier, 0.5, 4.0, defaults._wideMultiplier);
 	validateRange(_recentStickersCount, 1, 200, defaults._recentStickersCount);
-	validateRange(_avatarCorners, 0, AyuUiSettings::kMaxAvatarCorners, defaults._avatarCorners);
+	validateRange(_avatarCorners, 0, 23, defaults._avatarCorners);
 
 	const auto embeddedType = _messageShotSettings._embeddedThemeType.current();
 	auto embeddedTypeValid = (embeddedType == -1) || (embeddedType >= 0 && embeddedType <= 3); // from Window::Theme::EmbeddedType::DayBlue to Window::Theme::EmbeddedType::NightGreen
@@ -658,7 +657,6 @@ void AyuSettings::setIncreaseWebviewWidth(bool val) {
 void AyuSettings::setMaterialSwitches(bool val) {
 	if (_materialSwitches.current() == val) return;
 	_materialSwitches = val;
-	AyuUiSettings::setMaterialSwitches(val);
 	repaintApp();
 	save();
 }
@@ -1045,7 +1043,6 @@ void AyuSettings::setCrashReporting(bool val) {
 void AyuSettings::setAvatarCorners(int val) {
 	if (_avatarCorners.current() == val) return;
 	_avatarCorners = val;
-	AyuUiSettings::setAvatarCorners(val);
 	save();
 }
 

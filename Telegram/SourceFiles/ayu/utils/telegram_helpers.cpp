@@ -844,6 +844,10 @@ void searchPeerInner(const QString &peerId, Main::Session *session, const Userna
 				[&](const MTPDbotInlineMessageMediaWebPage &data)
 				{
 					return QString();
+				},
+				[&](const MTPDbotInlineMessageRichMessage &data)
+				{
+					return QString();
 				});
 
 			if (text.isEmpty() || text.contains(usernameResolverEmpty)) {
@@ -1175,13 +1179,9 @@ TextWithEntities reverseLocalPremiumEmoji(const TextWithEntities &text, not_null
 		if (entity.type() != EntityType::CustomEmoji) {
 			continue;
 		}
-		const auto shouldConvert = entity.isLocal()
-			? (isForQuote
-				|| (!history->peer->isSelf() && !premium && !emojiAllowed(entity)))
-			: (!isForQuote
-				&& !history->peer->isSelf()
-				&& !premium
-				&& !emojiAllowed(entity));
+		const auto shouldConvert = (!history->peer->isSelf()
+			&& !premium
+			&& !emojiAllowed(entity));
 		if (shouldConvert) {
 			entity = EntityInText(
 				EntityType::CustomUrl,
@@ -1216,7 +1216,6 @@ void applyLocalPremiumEmoji(TextWithEntities &text) {
 							entity.offset(),
 							entity.length(),
 							emojiId);
-						entity.setLocal();
 					}
 				}
 			}
@@ -1359,6 +1358,10 @@ void getUserRegistrationDateInner(
 					return QString();
 				},
 				[&](const MTPDbotInlineMessageMediaWebPage &data)
+				{
+					return QString();
+				},
+				[&](const MTPDbotInlineMessageRichMessage &data)
 				{
 					return QString();
 				});

@@ -1118,25 +1118,6 @@ void StickersListWidget::fillFilteredStickersRow() {
 		std::move(elements));
 }
 
-void StickersListWidget::addSearchRow(not_null<StickersSet*> set) {
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.showOnlyAddedEmojisAndStickers() && !SetInMyList(set->flags)) {
-		return;
-	}
-	const auto skipPremium = !session().premiumPossible();
-	auto elements = PrepareStickers(
-		set->stickers.empty() ? set->covers : set->stickers,
-		skipPremium);
-	_searchSets.emplace_back(
-		set->id,
-		set,
-		set->flags,
-		set->title,
-		set->shortName,
-		set->count,
-		!SetInMyList(set->flags),
-		std::move(elements));
-}
 void StickersListWidget::toggleSearchLoading(bool loading) {
 	if (_search) {
 		_search->setLoading(loading);

@@ -292,10 +292,6 @@ void Cover::initViewers() {
 		updateIdText();
 	}, lifetime());
 
-	_user->session().settings().phoneNumberHiddenValue(
-	) | rpl::on_next([=] {
-		updatePhoneText();
-	}, lifetime());
 
 	Info::Profile::UsernameValue(
 		_user

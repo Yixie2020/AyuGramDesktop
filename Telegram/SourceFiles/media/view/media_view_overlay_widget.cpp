@@ -3487,7 +3487,7 @@ void OverlayWidget::deleteMedia() {
 					Ui::LayerOption::CloseOther);
 			} else {
 				window->show(
-					Box<DeleteMessagesBox>(message),
+					Box<DeleteMessagesBox>(message, false),
 					Ui::LayerOption::CloseOther);
 			}
 		}

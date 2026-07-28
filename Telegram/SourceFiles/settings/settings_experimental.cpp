@@ -191,7 +191,6 @@ void SetupCopyDeepLink(
 		e->accept();
 	}, button->lifetime());
 }
-}
 
 void AddOption(
 		not_null<Window::Controller*> window,
@@ -569,7 +568,7 @@ base::weak_qptr<Ui::RpWidget> Experimental::createPinnedToTop(
 		_query = std::move(text);
 	}, searchContainer->lifetime());
 
-	return base::make_weak(not_null<Ui::RpWidget*>{ searchContainer });
+	return base::make_weak(static_cast<Ui::RpWidget*>(searchContainer));
 }
 
 void Experimental::setupContent() {

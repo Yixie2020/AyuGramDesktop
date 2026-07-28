@@ -5398,7 +5398,7 @@ void HistoryWidget::saveEditMessage(Api::SendOptions options) {
 			|| !webPageDraft.manual)
 		&& !hasMediaWithCaption) {
 		if (item->computeSuggestionActions() == SuggestionActions::None) {
-			controller()->show(Box<DeleteMessagesBox>(item));
+			controller()->show(Box<DeleteMessagesBox>(item, false));
 		}
 		return;
 	} else {

@@ -618,7 +618,7 @@ mac:
 """)
 
 stage('openssl3', """
-    git clone -b openssl-3.2.1 https://github.com/openssl/openssl openssl3
+    git clone --depth 1 -b openssl-3.2.1 https://github.com/openssl/openssl openssl3
     cd openssl3
 win32:
     perl Configure no-shared no-tests debug-VC-WIN32 /FS
@@ -1171,11 +1171,11 @@ win:
 """)
 
 stage('regex', """
-    git clone -b boost-1.83.0 https://github.com/boostorg/regex.git
+    git clone --depth 1 -b boost-1.83.0 https://github.com/boostorg/regex.git
 """)
 
 stage('ffmpeg', """
-    git clone -b n6.1.6 https://github.com/FFmpeg/FFmpeg.git ffmpeg
+    git clone --depth 1 -b n6.1.6 https://github.com/FFmpeg/FFmpeg.git ffmpeg
     cd ffmpeg
 win:
 depends:patches/ffmpeg.patch

@@ -6266,7 +6266,7 @@ void HistoryInner::deleteItem(not_null<HistoryItem*> item) {
 			nullptr,
 			opt));
 	} else {
-		_controller->show(Box<DeleteMessagesBox>(item));
+		_controller->show(Box<DeleteMessagesBox>(item, false));
 	}
 }
 
