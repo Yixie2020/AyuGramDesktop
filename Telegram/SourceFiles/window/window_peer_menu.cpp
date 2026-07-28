@@ -127,10 +127,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_credits.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
+#include "styles/style_share_box.h"
 #include "styles/style_window.h" // st::windowMinWidth
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
-#include "styles/style_settings.h"
 
 #include <QAction>
 #include <QtWidgets/QApplication>
@@ -641,6 +641,7 @@ void Filler::addInfo() {
 	}
 	const auto controller = _controller;
 	const auto weak = base::make_weak(_thread);
+	const auto channel = infoPeer->asChannel();
 	const auto text = _thread->asTopic()
 		? (_thread->peer()->isBot()
 			? tr::lng_context_view_thread(tr::now)
@@ -649,6 +650,8 @@ void Filler::addInfo() {
 		? tr::lng_context_view_group(tr::now)
 		: infoPeer->isUser()
 		? tr::lng_context_view_profile(tr::now)
+		: (channel && channel->isCommunity())
+		? tr::lng_context_view_community(tr::now)
 		: tr::lng_context_view_channel(tr::now);
 	_addAction(text, [=] {
 		if (const auto strong = weak.get()) {
@@ -2824,9 +2827,11 @@ object_ptr<Ui::BoxContent> PrepareChooseRecipientBox(
 			const auto count = delegate()->peerListSelectedRowsCount();
 			const auto forum = row->peer()->isForum();
 			const auto monoforum = row->peer()->isMonoforum();
-			if (showLockedError(row) || (count && (forum || monoforum))) {
+			const auto community = JoinedCommunityChats(row->peer());
+			if (showLockedError(row)
+				|| (count && (forum || monoforum || community))) {
 				return;
-			} else if (forum || monoforum) {
+			} else if (forum || monoforum || community) {
 				ChooseRecipientBoxController::rowClicked(row);
 			} else {
 				delegate()->peerListSetRowChecked(row, !row->checked());
@@ -2844,7 +2849,8 @@ object_ptr<Ui::BoxContent> PrepareChooseRecipientBox(
 			}
 			if (!row->checked()
 				&& !row->peer()->isForum()
-				&& !row->peer()->isMonoforum()) {
+				&& !row->peer()->isMonoforum()
+				&& !JoinedCommunityChats(row->peer())) {
 				auto menu = base::make_unique_q<Ui::PopupMenu>(
 					parent,
 					st::popupMenuWithIcons);
@@ -3141,9 +3147,11 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 			const auto count = delegate()->peerListSelectedRowsCount();
 			const auto forum = row->peer()->isForum();
 			const auto monoforum = row->peer()->isMonoforum();
-			if (showLockedError(row) || (count && (forum || monoforum))) {
+			const auto community = JoinedCommunityChats(row->peer());
+			if (showLockedError(row)
+				|| (count && (forum || monoforum || community))) {
 				return;
-			} else if (!count || forum || monoforum) {
+			} else if (!count || forum || monoforum || community) {
 				if (base::IsCtrlPressed() || base::IsShiftPressed()) {
 					delegate()->peerListSetRowChecked(row, !row->checked());
 					_selectionChanges.fire({});
@@ -3161,7 +3169,8 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 				not_null<PeerListRow*> row) override final {
 			if (!row->checked()
 				&& !row->peer()->isForum()
-				&& !row->peer()->isMonoforum()) {
+				&& !row->peer()->isMonoforum()
+				&& !JoinedCommunityChats(row->peer())) {
 				auto menu = base::make_unique_q<Ui::PopupMenu>(
 					parent,
 					st::popupMenuWithIcons);
@@ -4546,6 +4555,11 @@ void ForwardToSelf(
 						.text = std::move(phrase),
 						.filter = ChatHelpers::ForwardedToSavedMessagesFilter(
 							session),
+						.iconLottie = ChatHelpers::ForwardedMessagePhraseIcon({
+							.toCount = 1,
+							.to1 = session->user(),
+						}),
+						.iconLottieSize = st::toastLottieIconSize,
 					});
 				}
 			});

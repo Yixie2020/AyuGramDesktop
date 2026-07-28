@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_credits.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_premium.h"
 #include "styles/style_settings.h"
 #include "base/qt/qt_common_adapters.h"
 
@@ -544,7 +545,10 @@ auto InitMessageFieldHandlers(MessageFieldHandlersArgs &&args)
 		Core::App().settings().replaceEmojiValue(),
 		Core::App().settings().systemTextReplaceValue());
 	field->setMarkdownReplacesEnabled(rpl::single(Ui::MarkdownEnabledState{
-		Ui::MarkdownEnabled{ std::move(args.allowMarkdownTags) }
+		Ui::MarkdownEnabled{
+			std::move(args.allowMarkdownTags),
+			args.allowTypedMarkdown
+		}
 	}));
 	if (const auto &show = args.show) {
 		field->setEditLinkCallback(

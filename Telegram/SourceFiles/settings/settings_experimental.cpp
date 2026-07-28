@@ -7,7 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/settings_experimental.h"
 
+#include "settings/settings_common.h"
 #include "data/components/passkeys.h"
+#include "ui/layers/generic_box.h"
 #include "main/main_session.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/search_field_controller.h"
@@ -48,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/session_private.h"
 #include "webview/webview_embed.h"
 #include "window/main_window.h"
+#include "window/window_filters_favorite.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
@@ -162,6 +165,34 @@ struct ResolvedReferrer {
 	return QString();
 }
 
+void SetupCopyDeepLink(
+		not_null<Window::Controller*> window,
+		not_null<Button*> button,
+		const QString &id) {
+	const auto link = u"tg://settings/experimental/"_q + id;
+	const auto menu
+		= button->lifetime().make_state<base::unique_qptr<Ui::PopupMenu>>();
+	button->events(
+	) | rpl::filter([](not_null<QEvent*> e) {
+		return e->type() == QEvent::ContextMenu;
+	}) | rpl::on_next([=](not_null<QEvent*> e) {
+		*menu = base::make_unique_q<Ui::PopupMenu>(
+			button,
+			st::popupMenuWithIcons);
+		(*menu)->addAction(u"Copy deep link"_q, [=] {
+			TextUtilities::SetClipboardText({ link });
+			window->showToast({
+				.text = { u"Deep link copied to clipboard."_q },
+				.iconLottie = u"toast/voip_invite"_q,
+				.iconLottieSize = st::toastLottieIconSize,
+			});
+		}, &st::menuIconCopy);
+		(*menu)->popup(QCursor::pos());
+		e->accept();
+	}, button->lifetime());
+}
+}
+
 void AddOption(
 		not_null<Window::Controller*> window,
 		not_null<Window::SessionController*> controller,
@@ -220,27 +251,7 @@ void AddOption(
 		registerHighlight(u"experimental/"_q + option.id(), button);
 	}
 
-	const auto link = u"tg://settings/experimental/"_q + option.id();
-	const auto menu
-		= button->lifetime().make_state<base::unique_qptr<Ui::PopupMenu>>();
-	button->events(
-	) | rpl::filter([](not_null<QEvent*> e) {
-		return e->type() == QEvent::ContextMenu;
-	}) | rpl::on_next([=](not_null<QEvent*> e) {
-		*menu = base::make_unique_q<Ui::PopupMenu>(
-			button,
-			st::popupMenuWithIcons);
-		(*menu)->addAction(u"Copy deep link"_q, [=] {
-			TextUtilities::SetClipboardText({ link });
-			window->showToast({
-				.text = { u"Deep link copied to clipboard."_q },
-				.iconLottie = u"toast/voip_invite"_q,
-				.iconLottieSize = st::toastLottieIconSize,
-			});
-		}, &st::menuIconCopy);
-		(*menu)->popup(QCursor::pos());
-		e->accept();
-	}, button->lifetime());
+	SetupCopyDeepLink(window, button, option.id());
 
 	const auto restarter = (referrer.isEmpty()
 		&& option.relevant()
@@ -273,6 +284,63 @@ void AddOption(
 			}
 		}, inner->lifetime());
 	}
+
+	if (!description.isEmpty()) {
+		Ui::AddSkip(inner, st::settingsCheckboxesSkip);
+		Ui::AddDividerText(inner, rpl::single(description));
+		Ui::AddSkip(inner, st::settingsCheckboxesSkip);
+	}
+
+	std::move(
+		query
+	) | rpl::on_next([=](const QString &text) {
+		const auto trimmed = text.trimmed();
+		const auto matches = trimmed.isEmpty()
+			|| name.contains(trimmed, Qt::CaseInsensitive)
+			|| description.contains(trimmed, Qt::CaseInsensitive);
+		wrap->toggle(matches, anim::type::instant);
+	}, wrap->lifetime());
+}
+
+void AddFavoriteLinkButton(
+		not_null<Window::Controller*> window,
+		not_null<Ui::VerticalLayout*> container,
+		rpl::producer<QString> query,
+		Fn<void(const QString&, not_null<QWidget*>)> registerHighlight) {
+	const auto option = &base::options::lookup<QString>(
+		Window::kOptionFolderFavoriteLink);
+	const auto name = option->name().isEmpty()
+		? option->id()
+		: option->name();
+	const auto &description = option->description();
+
+	const auto wrap = container->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			container,
+			object_ptr<Ui::VerticalLayout>(container)));
+	const auto inner = wrap->entity();
+
+	auto label = rpl::single(
+		rpl::empty
+	) | rpl::then(
+		option->changes()
+	) | rpl::map([option] {
+		return option->value();
+	});
+	const auto button = AddButtonWithLabel(
+		inner,
+		rpl::single(name),
+		std::move(label),
+		st::settingsButtonNoIcon);
+	button->setClickedCallback([=] {
+		window->show(Box(Window::EditFolderFavoriteLinkBox));
+	});
+
+	if (registerHighlight) {
+		registerHighlight(u"experimental/"_q + option->id(), button);
+	}
+
+	SetupCopyDeepLink(window, button, option->id());
 
 	if (!description.isEmpty()) {
 		Ui::AddSkip(inner, st::settingsCheckboxesSkip);
@@ -395,6 +463,12 @@ void SetupExperimental(
 	addToggle(HistoryView::Controls::kOptionMacCmdReplyImmediately);
 	addToggle(Ui::kOptionQScroller);
 	addToggle(FFmpeg::kOptionFFmpegMultiThread);
+
+	AddFavoriteLinkButton(
+		window,
+		container,
+		rpl::duplicate(query),
+		registerHighlight);
 }
 
 } // namespace

@@ -38,12 +38,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "lang/lang_keys.h"
 #include "window/notifications_manager.h"
-#include "styles/style_chat.h"
-
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
-
 
 namespace {
 
@@ -374,36 +368,18 @@ void UserData::setName(
 		const QString &newLastName,
 		const QString &newPhoneName,
 		const QString &newUsername) {
-	auto filteredFirstName = newFirstName;
-	auto filteredLastName = newLastName;
+	bool changeName = !newFirstName.isEmpty() || !newLastName.isEmpty();
 
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.filterZalgo()) {
-		filteredFirstName = filterZalgo(filteredFirstName);
-		filteredLastName = filterZalgo(filteredLastName);
-	}
-
-	bool changeName = !filteredFirstName.isEmpty() || !filteredLastName.isEmpty();
-
-	QString newFullName;
-	if (changeName && filteredFirstName.trimmed().isEmpty()) {
-		firstName = filteredLastName;
+	if (changeName && newFirstName.trimmed().isEmpty()) {
+		firstName = newLastName;
 		lastName = QString();
-		newFullName = firstName;
 	} else {
 		if (changeName) {
-			firstName = filteredFirstName;
-			lastName = filteredLastName;
+			firstName = newFirstName;
+			lastName = newLastName;
 		}
-		newFullName = lastName.isEmpty()
-			? firstName
-			: tr::lng_full_name(
-				tr::now,
-				lt_first_name,
-				firstName,
-				lt_last_name,
-				lastName);
 	}
+	const auto newFullName = langFullName(firstName, lastName);
 	updateNameDelayed(newFullName, newPhoneName, newUsername);
 }
 
@@ -633,15 +609,6 @@ bool UserData::isFake() const {
 }
 
 bool UserData::isPremium() const {
-	if (id) {
-		const auto &settings = AyuSettings::getInstance();
-		if (settings.localPremium()) {
-			if (getSession(id.value)) {
-				return true;
-			}
-		}
-	}
-
 	return flags() & UserDataFlag::Premium;
 }
 
@@ -698,12 +665,8 @@ bool UserData::readDatesPrivate() const {
 }
 
 bool UserData::allowsForwarding() const {
-	return true;
-}
-
-bool UserData::isAyuNoForwards() const {
-	return (flags() & Flag::NoForwardsMyEnabled)
-		|| (flags() & Flag::NoForwardsPeerEnabled);
+	return !(flags() & Flag::NoForwardsMyEnabled)
+		&& !(flags() & Flag::NoForwardsPeerEnabled);
 }
 
 void UserData::setNoForwardsFlags(bool myEnabled, bool peerEnabled) {

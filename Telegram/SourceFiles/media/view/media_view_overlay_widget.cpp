@@ -102,6 +102,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_overlay_widget.h"
 #include "storage/file_download.h"
 #include "storage/storage_account.h"
+#include "styles/style_chat_style.h"
 #include "styles/style_media_view.h"
 #include "styles/style_calls.h"
 #include "styles/style_chat.h"
@@ -1025,6 +1026,14 @@ void OverlayWidget::setupWindow() {
 		} else if (_stories && _stories->ignoreWindowMove(widgetPoint)) {
 		} else if (_sponsoredButton
 			&& _sponsoredButton->geometry().contains(widgetPoint)) {
+		} else if (_showRecognitionResults
+			&& _recognitionResult.success
+			&& !_recognitionResult.items.empty()
+			&& _recognition.positionAt(
+				widgetPoint,
+				finalContentRect(),
+				_rotation,
+				false).item >= 0) {
 		} else if (_windowed) {
 			result |= Flag::Move;
 		}
@@ -8729,6 +8738,7 @@ void OverlayWidget::updateHeader() {
 			}
 		}
 	} else {
+		const auto channel = _peer ? _peer->asChannel() : nullptr;
 		if (_document) {
 			_headerText = _document->filename().isEmpty()
 				? tr::lng_mediaview_doc_image(tr::now)
@@ -8743,8 +8753,10 @@ void OverlayWidget::updateHeader() {
 			} else {
 				_headerText = tr::lng_mediaview_profile_photo(tr::now);
 			}
+		} else if (channel && channel->isCommunity()) {
+			_headerText = tr::lng_mediaview_community_photo(tr::now);
 		} else if ((_history && _history->peer->isBroadcast())
-			|| (_peer && _peer->isChannel() && !_peer->isMegagroup())) {
+			|| (channel && !channel->isMegagroup())) {
 			_headerText = tr::lng_mediaview_channel_photo(tr::now);
 		} else if (_peer) {
 			_headerText = tr::lng_mediaview_group_photo(tr::now);

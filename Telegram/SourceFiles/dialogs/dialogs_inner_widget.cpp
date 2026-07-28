@@ -175,7 +175,7 @@ constexpr auto kPreviewPostsLimit = 3;
 [[nodiscard]] object_ptr<SearchEmpty> MakeSearchEmpty(
 		QWidget *parent,
 		SearchState state,
-		Fn<void()> resetChatTypeFilter) {
+		Fn<void()> resetSearchFilters) {
 	const auto query = state.query.trimmed();
 	const auto hashtag = !query.isEmpty() && (query[0] == '#');
 	const auto trimmed = hashtag ? query.mid(1).trimmed() : query;
@@ -193,7 +193,7 @@ constexpr auto kPreviewPostsLimit = 3;
 		&& !fromPeer;
 	const auto suggestAllChats = !waiting
 		&& state.tab == ChatSearchTab::MyMessages
-		&& state.filter != ChatTypeFilter::All;
+		&& (state.filter != ChatTypeFilter::All || !state.fromArchive);
 	const auto icon = waiting
 		? SearchEmptyIcon::Search
 		: SearchEmptyIcon::NoResults;
@@ -232,7 +232,7 @@ constexpr auto kPreviewPostsLimit = 3;
 		rpl::single(std::move(text)));
 	if (suggestAllChats) {
 		result->handlerActivated(
-		) | rpl::on_next(resetChatTypeFilter, result->lifetime());
+		) | rpl::on_next(resetSearchFilters, result->lifetime());
 	}
 	result->show();
 	result->resizeToWidth(parent->width());
@@ -622,7 +622,7 @@ bool InnerWidget::updateEntryHeight(not_null<Entry*> entry) {
 			top += result.row->height();
 		}
 	}
-	if (_openedCommunity) {
+	if (communityModeShown()) {
 		if (const auto history = entry->asHistory()) {
 			const auto recount = [&](CommunityRowsView &view) {
 				if (view.contains(history)) {
@@ -643,7 +643,7 @@ void InnerWidget::setNarrowRatio(float64 narrowRatio) {
 	_geometryInited = true;
 	_narrowRatio = narrowRatio;
 	auto changed = _shownList->updateHeights(_narrowRatio);
-	if (_openedCommunity) {
+	if (communityModeShown()) {
 		const auto recount = [&](CommunityRowsView &view) {
 			const auto was = view.height();
 			view.recountHeights(_narrowRatio);
@@ -715,7 +715,7 @@ int InnerWidget::dialogsOffset() const {
 	return collapsedRowsOffset()
 		+ (_collapsedRows.size() * st::dialogsImportantBarHeight)
 		- skipTopHeight()
-		+ ((_openedCommunity && !_shownList->empty())
+		+ ((communityModeShown() && !_shownList->empty())
 			? st::searchedBarHeight
 			: 0);
 }
@@ -847,6 +847,10 @@ int InnerWidget::communityRowAbsoluteTop(int index) const {
 		+ _communityViewable.rowTop(index);
 }
 
+bool InnerWidget::communityModeShown() const {
+	return _openedCommunity && !_openedForum;
+}
+
 void InnerWidget::changeOpenedFolder(Data::Folder *folder) {
 	Expects(!folder || !_savedSublists);
 
@@ -885,6 +889,9 @@ void InnerWidget::changeOpenedForum(Data::Forum *forum) {
 	_openedForum = forum;
 	_st = forum ? &st::forumTopicRow : &st::defaultDialogRow;
 	refreshShownList();
+	if (!forum && _openedCommunity) {
+		rebuildCommunitySections();
+	}
 
 	_openedForumLifetime.destroy();
 	if (forum) {
@@ -910,7 +917,7 @@ void InnerWidget::rebuildCommunitySections() {
 	_communityViewable.clear();
 	_communitySelected = -1;
 	setCommunityPressed(-1);
-	if (!_openedCommunity) {
+	if (!communityModeShown()) {
 		return;
 	}
 	const auto owner = &session().data();
@@ -1027,14 +1034,14 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 		.topicJumpCache = _topicJumpCache.get(),
 		.folder = _openedFolder,
 		.forum = _openedForum,
-		.community = _openedCommunity,
+		.community = communityModeShown() ? _openedCommunity : nullptr,
 		.currentBg = currentBg(),
 		.filter = _filterId,
 		.now = ms,
 		.width = fullWidth,
 		.paused = videoPaused,
 		.narrow = (fullWidth < st::columnMinimalWidthLeft / 2),
-		.insideCommunity = (_openedCommunity != nullptr),
+		.insideCommunity = communityModeShown(),
 	};
 	const auto fillGuard = gsl::finally([&] {
 		// We translate painter down, but it'll be cropped below rect.
@@ -1231,14 +1238,14 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 		}
 	};
 	if (_state == WidgetState::Default) {
-		if (_openedCommunity) {
+		if (communityModeShown()) {
 			p.save();
 		}
 		const auto collapsedSkip = collapsedRowsOffset();
 		p.translate(0, collapsedSkip);
 		paintCollapsedRows(p, r.translated(0, -collapsedSkip));
 
-		if (_openedCommunity && !_shownList->empty()) {
+		if (communityModeShown() && !_shownList->empty()) {
 			p.translate(0, st::searchedBarHeight);
 		}
 
@@ -1324,7 +1331,7 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 		} else {
 			p.fillRect(dialogsClip, currentBg());
 		}
-		if (_openedCommunity) {
+		if (communityModeShown()) {
 			p.restore();
 			const auto paintBar = [&](const QString &text) {
 				p.fillRect(
@@ -1678,7 +1685,10 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 				? st::searchedBarFont->underline()
 				: st::searchedBarFont;
 			if (hasChatTypeFilter()) {
-				const auto text = ChatTypeFilterLabel(_searchState.filter);
+				const auto text = (_searchState.filter == ChatTypeFilter::All
+					&& !_searchState.fromArchive)
+					? tr::lng_search_filter_non_archived(tr::now)
+					: ChatTypeFilterLabel(_searchState.filter);
 				if (!_chatTypeFilterWidth) {
 					_chatTypeFilterWidth = filterFont->width(text);
 				}
@@ -2280,7 +2290,7 @@ void InnerWidget::selectByMouse(QPoint globalPosition) {
 		const auto selectedRightButton = selected
 			&& lookupIsInBotAppButton(selected, QPoint(local.x(), mappedY));
 		auto communitySelected = -1;
-		if (_openedCommunity && !selected && collapsedSelected < 0) {
+		if (communityModeShown() && !selected && collapsedSelected < 0) {
 			const auto pick = [&](
 					int sectionTop,
 					int flatBase,
@@ -3363,7 +3373,7 @@ void InnerWidget::handleChatListEntryRefreshes() {
 			return (topic->forum() == _openedForum);
 		} else if (const auto sublist = event.key.sublist()) {
 			return sublist->parent() == _savedSublists;
-		} else if (_openedCommunity) {
+		} else if (communityModeShown()) {
 			const auto history = event.key.history();
 			return history
 				&& (history->communityListInfo() == _openedCommunity);
@@ -3391,7 +3401,7 @@ void InnerWidget::handleChatListEntryRefreshes() {
 				? (key.topic()->forum() == _openedForum)
 				: key.sublist()
 				? (key.sublist()->parent() == _savedSublists)
-				: _openedCommunity
+				: communityModeShown()
 				? (entry->asHistory()
 					&& entry->asHistory()->communityListInfo()
 						== _openedCommunity)
@@ -3429,7 +3439,7 @@ void InnerWidget::handleChatListEntryRefreshes() {
 				}
 				_updated.fire({});
 			}
-			if (_openedCommunity) {
+			if (communityModeShown()) {
 				rebuildCommunitySections();
 			}
 			refresh();
@@ -4275,7 +4285,8 @@ void InnerWidget::applySearchState(SearchState state) {
 	if (state.inChat) {
 		onHashtagFilterUpdate(QStringView());
 	}
-	if (state.filter != _searchState.filter) {
+	if (state.filter != _searchState.filter
+		|| state.fromArchive != _searchState.fromArchive) {
 		_chatTypeFilterWidth = 0;
 		update();
 	}
@@ -4594,6 +4605,14 @@ auto InnerWidget::changeSearchFilterRequests() const
 	return _changeSearchFilterRequests.events();
 }
 
+rpl::producer<bool> InnerWidget::changeSearchFromArchiveRequests() const {
+	return _changeSearchFromArchiveRequests.events();
+}
+
+rpl::producer<> InnerWidget::resetSearchRestrictionsRequests() const {
+	return _resetSearchRestrictionsRequests.events();
+}
+
 rpl::producer<> InnerWidget::cancelSearchRequests() const {
 	return _cancelSearchRequests.events();
 }
@@ -4890,7 +4909,7 @@ void InnerWidget::refresh(bool toTop) {
 	}
 	auto h = 0;
 	if (_state == WidgetState::Default) {
-		if (_openedCommunity) {
+		if (communityModeShown()) {
 			const auto requestableShown = _communityRequestableList
 				&& (_communityRequestableCount > 0);
 			if (_shownList->empty()
@@ -4940,7 +4959,7 @@ void InnerWidget::refreshEmpty() {
 		} else if (_searchEmptyState != _searchState) {
 			_searchEmptyState = _searchState;
 			_searchEmpty = MakeSearchEmpty(this, _searchState, [=] {
-				_changeSearchFilterRequests.fire(ChatTypeFilter::All);
+				_resetSearchRestrictionsRequests.fire({});
 			});
 			if (_controller->session().data().chatsListLoaded()) {
 				_searchEmpty->animate();
@@ -5131,7 +5150,7 @@ void InnerWidget::updateCommunityRequestableGeometry() {
 	if (!_communityRequestableList) {
 		return;
 	}
-	const auto shown = _openedCommunity
+	const auto shown = communityModeShown()
 		&& (_state == WidgetState::Default)
 		&& (_communityRequestableCount > 0);
 	_communityRequestableList->setVisible(shown);
@@ -5185,7 +5204,7 @@ bool InnerWidget::archiveSearchActive() const {
 }
 
 bool InnerWidget::communitySearchActive() const {
-	return (_openedCommunity || _searchState.community)
+	return (communityModeShown() || _searchState.community)
 		&& ((_searchState.tab == ChatSearchTab::ThisCommunity)
 			|| !QStringView(_searchState.query).trimmed().isEmpty());
 }
@@ -5258,7 +5277,7 @@ void InnerWidget::updateSearchIn() {
 		: nullptr;
 	const auto communityChannel = _searchState.community
 		? _searchState.community
-		: _openedCommunity
+		: communityModeShown()
 		? _openedCommunity->channel().get()
 		: nullptr;
 	const auto communityIcon = (communityChannel && !_searchState.inChat)
@@ -5871,6 +5890,10 @@ bool InnerWidget::chooseRow(
 		_menu = base::make_unique_q<Ui::PopupMenu>(
 			this,
 			st::popupMenuWithIcons);
+		_menu->addAction(tr::lng_search_filter_from_archive(tr::now), [=] {
+			_changeSearchFromArchiveRequests.fire_copy(
+				!_searchState.fromArchive);
+		}, _searchState.fromArchive ? &st::mediaPlayerMenuCheck : nullptr);
 		for (const auto tab : {
 			ChatTypeFilter::All,
 			ChatTypeFilter::Private,
