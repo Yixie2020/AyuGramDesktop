@@ -343,7 +343,27 @@ void Make(not_null<QWidget*> box, const ShotConfig &config, const Fn<void(QImage
 			const auto &message = messages[i];
 			const auto view = getView(message);
 
-			const auto displayUserpic = view->displayFromPhoto() || message->isPost();
+			const auto isSameSenderWithNext = [&] {
+				if (i + 1 >= messages.size()) {
+					return false;
+				}
+				const auto &nextMessage = messages[i + 1];
+				if (const auto fromCurrent = message->displayFrom()) {
+					if (const auto fromNext = nextMessage->displayFrom()) {
+						return fromCurrent == fromNext;
+					}
+					return false;
+				}
+				const auto infoCurrent = message->displayHiddenSenderInfo();
+				const auto infoNext = nextMessage->displayHiddenSenderInfo();
+				if (infoCurrent && infoNext) {
+					return infoCurrent->name == infoNext->name;
+				}
+				return false;
+			}();
+
+			const auto hasPhoto = view->displayFromPhoto() || view->hasFromPhoto() || message->isPost();
+			const auto displayUserpic = hasPhoto && !isSameSenderWithNext;
 
 			const auto rect = QRect(0, 0, width, view->height());
 
