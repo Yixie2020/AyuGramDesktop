@@ -19,11 +19,13 @@ class Error;
 
 namespace Storage {
 
-// Different part sizes are not supported for now :(
-// Because we start downloading with some part size
-// and then we get a CDN-redirect where we support only
-// fixed part size download for hash checking.
-constexpr auto kDownloadPartSize = 128 * 1024;
+// CDN downloads always use a fixed part size for hash checking.
+constexpr auto kCdnDownloadPartSize = 128 * 1024;
+
+// AyuGram: download speed boost (ported from Nekogram).
+// The part size for regular DC downloads depends on the setting.
+[[nodiscard]] int DownloadPartSize();
+[[nodiscard]] int DownloadMaxPartsPerSession();
 
 class DownloadMtprotoTask;
 
@@ -180,6 +182,7 @@ private:
 	struct RequestData {
 		int64 offset = 0;
 		mutable int sessionIndex = 0;
+		int limit = 0;
 		int requestedInSession = 0;
 		crl::time sent = 0;
 
