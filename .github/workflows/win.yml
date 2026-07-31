@@ -49,10 +49,9 @@ jobs:
         run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - name: Clone.
-        uses: actions/checkout@v7
-        with:
-          submodules: recursive
-          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+        shell: cmd
+        run: |
+          git clone --depth 1 --recurse-submodules --shallow-submodules https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git %TBUILD%\%REPO_NAME%
 
       - name: First set up.
         shell: bash
