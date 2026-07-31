@@ -28,8 +28,8 @@ jobs:
     runs-on: windows-latest
 
     env:
-      UPLOAD_ARTIFACT: "false"
-      ONLY_CACHE: "true"
+      UPLOAD_ARTIFACT: "true"
+      ONLY_CACHE: "false"
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
 
     defaults:
