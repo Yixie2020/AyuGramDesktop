@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/calls_panel.h"
+#include "ayu/features/streamer_mode/streamer_mode.h"
 
 #include "boxes/peers/replace_boost_box.h" // CreateUserpicsWithMoreBadge
 #include "calls/calls_panel_background.h"
@@ -274,6 +275,9 @@ void Panel::savePanelGeometry() {
 }
 
 void Panel::initWindow() {
+	if (AyuFeatures::StreamerMode::isEnabled()) {
+		AyuFeatures::StreamerMode::hideWidgetWindow(window().get());
+	}
 	window()->setAttribute(Qt::WA_OpaquePaintEvent);
 	window()->setAttribute(Qt::WA_NoSystemBackground);
 	window()->setTitle(_user->name());
