@@ -8705,6 +8705,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ChannelBottomButtonDiscuss" = "Discuss";
 "ayu_SettingsShowID" = "Show Peer ID";
 "ayu_SettingsShowID_Hide" = "Hide";
+"ayu_DownloadSpeedBoost" = "Download Speed Boost";
+"ayu_DownloadSpeedBoost_Off" = "Off";
+"ayu_DownloadSpeedBoost_Average" = "Average";
+"ayu_DownloadSpeedBoost_Extreme" = "Extreme";
 "ayu_SettingsShowMessageShot" = "Show Message Shot";
 "ayu_SettingsShowMessageShotDescription" = "Allows taking a screenshot of the selected messages.";
 "ayu_SettingsRecentStickersCount" = "Recent Stickers Count";

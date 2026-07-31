@@ -125,7 +125,7 @@ void VideoPreload::load() {
 	}
 	const auto prefix = ChoosePreloadPrefix(_video);
 	Assert(prefix > 0 && prefix <= _video->size);
-	const auto part = Storage::kDownloadPartSize;
+	const auto part = _partSize;
 	const auto parts = (prefix + part - 1) / part;
 	for (auto i = 0; i != parts; ++i) {
 		_parts.emplace(i * part, QByteArray());
@@ -157,7 +157,7 @@ bool VideoPreload::Can(not_null<DocumentData*> video) {
 }
 
 bool VideoPreload::readyToRequest() const {
-	const auto part = Storage::kDownloadPartSize;
+	const auto part = _partSize;
 	return !_failed && (_nextRequestOffset < _parts.size() * part);
 }
 
@@ -165,18 +165,18 @@ int64 VideoPreload::takeNextRequestOffset() {
 	Expects(readyToRequest());
 
 	_requestedOffsets.emplace(_nextRequestOffset);
-	_nextRequestOffset += Storage::kDownloadPartSize;
+	_nextRequestOffset += _partSize;
 	return _requestedOffsets.back();
 }
 
 bool VideoPreload::feedPart(
 		int64 offset,
 		const QByteArray &bytes) {
-	Expects(offset < _parts.size() * Storage::kDownloadPartSize);
+	Expects(offset < _parts.size() * _partSize);
 	Expects(_requestedOffsets.contains(int(offset)));
-	Expects(bytes.size() <= Storage::kDownloadPartSize);
+	Expects(bytes.size() <= _partSize);
 
-	const auto part = Storage::kDownloadPartSize;
+	const auto part = _partSize;
 	_requestedOffsets.remove(int(offset));
 	_parts[offset] = bytes;
 	if ((_nextRequestOffset + part >= _parts.size() * part)
