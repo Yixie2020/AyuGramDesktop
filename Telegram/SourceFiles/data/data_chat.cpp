@@ -150,11 +150,13 @@ void ChatData::setFlags(ChatDataFlags which) {
 	const auto wasIn = amIn();
 	_flags.set(which);
 	if (wasIn && !amIn()) {
-		crl::on_main(&session(), [=] {
-			if (!amIn()) {
-				Core::App().closeChatFromWindows(this);
-			}
-		});
+		if (!cAyuSettings().keepForbiddenChats()) {
+			crl::on_main(&session(), [=] {
+				if (!amIn()) {
+					Core::App().closeChatFromWindows(this);
+				}
+			});
+		}
 	}
 }
 

@@ -650,6 +650,12 @@ void BuildSpyEssentials(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.getter = &AyuSettings::saveMessagesHistory,
 		.setter = &AyuSettings::setSaveMessagesHistory,
 	});
+	ayu.addSettingToggle({
+		.id = u"ayu/keepForbiddenChats"_q,
+		.title = tr::ayu_KeepForbiddenChats(),
+		.getter = &AyuSettings::keepForbiddenChats,
+		.setter = &AyuSettings::setKeepForbiddenChats,
+	});
 
 	ayu.addSectionDivider();
 

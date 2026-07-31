@@ -8613,6 +8613,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SpyEssentialsHeader" = "Spy essentials";
 "ayu_SaveDeletedMessages" = "Save Deleted Messages";
 "ayu_SaveMessagesHistory" = "Save Edits History";
+"ayu_KeepForbiddenChats" = "Keep Banned & Kicked Chats";
 "ayu_MessageSavingSaveMedia" = "Save Attachments";
 "ayu_MessageSavingSaveMediaHint" = "Configure chats & limits";
 "ayu_MessageSavingSaveMediaInPrivateChats" = "Private Chats";

@@ -229,11 +229,13 @@ void ChannelData::setFlags(ChannelDataFlags which) {
 		}
 
 		if (wasIn && !amIn()) {
-			crl::on_main(&session(), [=] {
-				if (!amIn()) {
-					Core::App().closeChatFromWindows(this);
-				}
-			});
+			if (!cAyuSettings().keepForbiddenChats()) {
+				crl::on_main(&session(), [=] {
+					if (!amIn()) {
+						Core::App().closeChatFromWindows(this);
+					}
+				});
+			}
 		}
 
 		// A membership change in a community member chat moves its history

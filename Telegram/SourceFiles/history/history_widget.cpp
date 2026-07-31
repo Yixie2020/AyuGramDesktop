@@ -4579,7 +4579,9 @@ void HistoryWidget::messagesFailed(const MTP::Error &error, int requestId) {
 		|| error.type() == u"CHANNEL_PUBLIC_GROUP_NA"_q
 		|| error.type() == u"USER_BANNED_IN_CHANNEL"_q) {
 		auto was = _peer;
-		closeCurrent();
+		if (!cAyuSettings().keepForbiddenChats()) {
+			closeCurrent();
+		}
 		const auto wasAccount = not_null(&was->account());
 		if (const auto primary = Core::App().windowFor(wasAccount)) {
 			primary->showToast(was->isMegagroup()
@@ -6651,7 +6653,7 @@ bool HistoryWidget::isBlocked() const {
 
 bool HistoryWidget::isJoinChannel() const {
 	if (const auto channel = _peer ? _peer->asChannel() : nullptr) {
-		return !channel->amIn() && !channel->isMonoforum();
+		return !channel->amIn() && !channel->isMonoforum() && !channel->isForbidden();
 	}
 	return false;
 }
