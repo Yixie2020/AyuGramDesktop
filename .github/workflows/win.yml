@@ -85,6 +85,10 @@ jobs:
             "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "%VSINSTALL%" --add Microsoft.VisualStudio.Component.VC.ATL --norestart --quiet --wait
           )
           if not exist "%VSINSTALL%\VC\atlmfc" mklink /d "%VSINSTALL%\VC\atlmfc" "%MSVCDIR%\atlmfc"
+          for /d %%i in ("%VSINSTALL%\VC\Tools\MSVC\*") do (
+            if exist "%%i\atlmfc\lib\x64\atls.lib" set "ATLLIB=%%i\atlmfc\lib\x64"
+          )
+          if defined ATLLIB echo LIB=%ATLLIB%;%LIB%>>%GITHUB_ENV%
 
       - name: NuGet sources.
         run: |
