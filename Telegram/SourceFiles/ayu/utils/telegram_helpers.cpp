@@ -1447,25 +1447,157 @@ void getUserRegistrationDateInner(
 	}).handleAllErrors().send();
 }
 
-void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)> callback) {
-	const auto session = &user->session();
-	const auto selfId = getDialogIdFromPeer(session->user());
-	const auto isSupporter = isSupporterPeer(selfId) || isExteraPeer(selfId);
+struct RegDateAnchor {
+	uint64 id;
+	int year;
+	int month;
+	int day;
+};
 
-	const auto botId = isSupporter ? regDateBotId : regDateBotFallbackId;
-	const auto botUsername = isSupporter ? regDateBotUsername : regDateBotFallbackUsername;
+static const RegDateAnchor kRegDateAnchors[] = {
+	{ 0ULL, 2013, 8, 14 },
+	{ 100000ULL, 2013, 10, 1 },
+	{ 1000000ULL, 2013, 12, 20 },
+	{ 10000000ULL, 2014, 11, 15 },
+	{ 50000000ULL, 2015, 7, 20 },
+	{ 100000000ULL, 2015, 12, 25 },
+	{ 200000000ULL, 2016, 9, 1 },
+	{ 300000000ULL, 2017, 4, 1 },
+	{ 400000000ULL, 2017, 11, 1 },
+	{ 500000000ULL, 2018, 2, 15 },
+	{ 600000000ULL, 2018, 7, 15 },
+	{ 700000000ULL, 2018, 12, 15 },
+	{ 800000000ULL, 2019, 5, 15 },
+	{ 900000000ULL, 2019, 8, 15 },
+	{ 1000000000ULL, 2019, 12, 31 },
+	{ 1200000000ULL, 2020, 6, 15 },
+	{ 1400000000ULL, 2020, 11, 15 },
+	{ 1600000000ULL, 2021, 3, 15 },
+	{ 1800000000ULL, 2021, 5, 15 },
+	{ 2000000000ULL, 2021, 9, 15 },
+	{ 5000000000ULL, 2022, 2, 1 },
+	{ 5341014808ULL, 2022, 5, 16 },
+	{ 5500000000ULL, 2022, 6, 15 },
+	{ 6000000000ULL, 2023, 1, 15 },
+	{ 6500000000ULL, 2023, 6, 15 },
+	{ 7000000000ULL, 2023, 12, 15 },
+	{ 7500000000ULL, 2024, 6, 15 },
+	{ 8000000000ULL, 2025, 1, 15 },
+	{ 8500000000ULL, 2025, 8, 15 },
+	{ 9000000000ULL, 2026, 2, 15 },
+};
 
-	if (session->data().userLoaded(botId)) {
-		getUserRegistrationDateInner(user, botId, callback);
+static QDate estimateUserRegistrationDate(uint64 id) {
+	const auto count = sizeof(kRegDateAnchors) / sizeof(kRegDateAnchors[0]);
+	if (id <= kRegDateAnchors[0].id) {
+		return QDate(kRegDateAnchors[0].year, kRegDateAnchors[0].month, kRegDateAnchors[0].day);
+	}
+	if (id >= kRegDateAnchors[count - 1].id) {
+		return QDate(kRegDateAnchors[count - 1].year, kRegDateAnchors[count - 1].month, kRegDateAnchors[count - 1].day);
+	}
+	for (size_t i = 0; i < count - 1; ++i) {
+		if (id >= kRegDateAnchors[i].id && id <= kRegDateAnchors[i + 1].id) {
+			const auto d1 = QDate(kRegDateAnchors[i].year, kRegDateAnchors[i].month, kRegDateAnchors[i].day);
+			const auto d2 = QDate(kRegDateAnchors[i + 1].year, kRegDateAnchors[i + 1].month, kRegDateAnchors[i + 1].day);
+			const auto daysBetween = d1.daysTo(d2);
+			const double ratio = double(id - kRegDateAnchors[i].id) / double(kRegDateAnchors[i + 1].id - kRegDateAnchors[i].id);
+			return d1.addDays(qRound(daysBetween * ratio));
+		}
+	}
+	return QDate();
+}
+
+static TextWithEntities appendTextWithEntities(TextWithEntities first, const TextWithEntities &second) {
+	if (second.empty()) {
+		return first;
+	}
+	if (first.empty()) {
+		return second;
+	}
+	const auto firstLen = first.text.length();
+	first.text += "\n" + second.text;
+	for (auto entity : second.entities) {
+		entity.offset += firstLen + 1;
+		first.entities.push_back(entity);
+	}
+	return first;
+}
+
+void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)> callback, PeerData *contextPeer) {
+	const auto userId = getBareID(user);
+	const auto estimatedDate = estimateUserRegistrationDate(userId);
+	const auto formattedDate = langDayOfMonthFull(estimatedDate);
+
+	TextWithEntities regResult;
+	if (user->isSelf()) {
+		regResult = tr::ayu_CreationDateSelfApproximately(
+			tr::now,
+			lt_item,
+			TextWithEntities{ formattedDate },
+			tr::rich
+		);
 	} else {
-		resolvePeer(
-			QString::number(botId),
-			botUsername,
-			session,
-			[=](const QString &title, PeerData *data)
-			{
-				getUserRegistrationDateInner(user, botId, callback);
-			});
+		regResult = tr::ayu_CreationDateUserApproximately(
+			tr::now,
+			lt_item1,
+			TextWithEntities{ user->name() },
+			lt_item2,
+			TextWithEntities{ formattedDate },
+			tr::rich
+		);
+	}
+
+	if (contextPeer && contextPeer != user) {
+		if (const auto channel = contextPeer->asChannel()) {
+			const auto date = channel->inviteDate ? channel->inviteDate : channel->date;
+			if (date) {
+				const auto joinDateFormatted = langDayOfMonthFull(base::unixtime::parse(date).date());
+				const auto joinText = user->isSelf()
+					? tr::ayu_JoinDateSelfInChat(
+						tr::now,
+						lt_item1,
+						TextWithEntities{ channel->name() },
+						lt_item2,
+						TextWithEntities{ joinDateFormatted },
+						tr::rich)
+					: tr::ayu_JoinDateUserInChat(
+						tr::now,
+						lt_item1,
+						TextWithEntities{ user->name() },
+						lt_item2,
+						TextWithEntities{ channel->name() },
+						lt_item3,
+						TextWithEntities{ joinDateFormatted },
+						tr::rich);
+				regResult = appendTextWithEntities(regResult, joinText);
+			}
+		} else if (const auto chat = contextPeer->asChat()) {
+			if (chat->date) {
+				const auto joinDateFormatted = langDayOfMonthFull(base::unixtime::parse(chat->date).date());
+				const auto joinText = user->isSelf()
+					? tr::ayu_JoinDateSelfInChat(
+						tr::now,
+						lt_item1,
+						TextWithEntities{ chat->name() },
+						lt_item2,
+						TextWithEntities{ joinDateFormatted },
+						tr::rich)
+					: tr::ayu_JoinDateUserInChat(
+						tr::now,
+						lt_item1,
+						TextWithEntities{ user->name() },
+						lt_item2,
+						TextWithEntities{ chat->name() },
+						lt_item3,
+						TextWithEntities{ joinDateFormatted },
+						tr::rich);
+				regResult = appendTextWithEntities(regResult, joinText);
+			}
+		}
+	}
+
+	if (callback) {
+		callback(regResult);
 	}
 }
 
@@ -1519,9 +1651,9 @@ void getChatCreateDate(not_null<ChatData*> chat, Fn<void(TextWithEntities)> call
 	}
 }
 
-void getRegistrationDate(not_null<PeerData*> peer, Fn<void(TextWithEntities)> callback) {
+void getRegistrationDate(not_null<PeerData*> peer, Fn<void(TextWithEntities)> callback, PeerData *contextPeer) {
 	if (const auto user = peer->asUser()) {
-		getUserRegistrationDate(user, callback);
+		getUserRegistrationDate(user, callback, contextPeer);
 	} else if (const auto channel = peer->asChannel()) {
 		getChannelJoinOrCreateDate(channel, callback);
 	} else if (const auto chat = peer->asChat()) {

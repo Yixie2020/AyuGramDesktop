@@ -8941,6 +8941,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_CreationDateSelfEarlier" = "You created your account earlier than **{item}**.";
 "ayu_CreationDateSelfLater" = "You created your account later than **{item}**.";
 "ayu_JoinDateChat" = "You joined **{item1}** on **{item2}**.";
+"ayu_JoinDateUserInChat" = "**{item1}** joined **{item2}** on **{item3}**.";
+"ayu_JoinDateSelfInChat" = "You joined **{item1}** on **{item2}**.";
 "ayu_JumpToBeginning" = "To Beginning";
 "ayu_ExpireMediaContextMenuText" = "Burn";
 "ayu_ExpiringVoiceMessageNote" = "This voice message can be played as many times as you want.";
