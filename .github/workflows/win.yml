@@ -76,6 +76,16 @@ jobs:
           sdk: ${{ env.SDK }}
           toolset: 14.44
 
+      - name: Install VC++ ATL for breakpad dump_syms.
+        shell: cmd
+        run: |
+          for /f "usebackq delims=" %%i in (`"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set "VSINSTALL=%%i"
+          for /d %%i in ("%VSINSTALL%\VC\Tools\MSVC\*") do set "MSVCDIR=%%i"
+          if not exist "%MSVCDIR%\atlmfc\include\atlbase.h" (
+            "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "%VSINSTALL%" --add Microsoft.VisualStudio.Component.VC.ATL --norestart --quiet --wait
+          )
+          if not exist "%VSINSTALL%\VC\atlmfc" mklink /d "%VSINSTALL%\VC\atlmfc" "%MSVCDIR%\atlmfc"
+
       - name: NuGet sources.
         run: |
           nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
