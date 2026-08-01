@@ -97,13 +97,12 @@ jobs:
           VER=$(grep "AppVersionStr" $REPO_NAME/Telegram/SourceFiles/core/version.h | sed -r 's/.*"([^"]+)".*/\1/')
           echo "APP_VERSION=$VER" >> $GITHUB_ENV
 
-      - name: Move artifact.
+      - name: Create dmg artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           cd $REPO_NAME/out/Release
           mkdir artifact
-          mv AyuGram.app artifact/
-          mv Updater artifact/
+          hdiutil create -volname AyuGram -srcfolder AyuGram.app -ov -format UDZO artifact/Ayugram_Mac_arm64_${APP_VERSION}.dmg
       - uses: actions/upload-artifact@v7
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
