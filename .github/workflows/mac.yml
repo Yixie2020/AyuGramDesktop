@@ -91,16 +91,22 @@ jobs:
 
           cmake --build ../out --config Release --parallel
 
+      - name: Get app version.
+        shell: bash
+        run: |
+          VER=$(grep "AppVersionStr" $REPO_NAME/Telegram/SourceFiles/core/version.h | sed -r 's/.*"([^"]+)".*/\1/')
+          echo "APP_VERSION=$VER" >> $GITHUB_ENV
+
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           cd $REPO_NAME/out/Release
           mkdir artifact
-          mv Telegram.app artifact/
+          mv AyuGram.app artifact/
           mv Updater artifact/
       - uses: actions/upload-artifact@v7
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
         with:
-          name: AyuGram-macOS-arm64
+          name: Ayugram_Mac_arm64_${{ env.APP_VERSION }}
           path: ${{ env.REPO_NAME }}/out/Release/artifact/

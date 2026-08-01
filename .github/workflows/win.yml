@@ -152,17 +152,23 @@ jobs:
 
           cmake --build ..\out --config Release --parallel
 
+      - name: Get app version.
+        shell: bash
+        run: |
+          VER=$(grep "AppVersionStr" $TBUILD/$REPO_NAME/Telegram/SourceFiles/core/version.h | sed -r 's/.*"([^"]+)".*/\1/')
+          echo "APP_VERSION=$VER" >> $GITHUB_ENV
+
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           set OUT=%TBUILD%\%REPO_NAME%\out\Release
           mkdir artifact
-          move %OUT%\Telegram.exe artifact/
+          move %OUT%\AyuGram.exe artifact/
           move %OUT%\Updater.exe artifact/
-          move %OUT%\Telegram.pdb artifact/ 2>nul & exit 0
+          move %OUT%\AyuGram.pdb artifact/ 2>nul & exit 0
       - uses: actions/upload-artifact@v7
         name: Upload artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         with:
-          name: AyuGram-Windows-x64
+          name: Ayugram_Windows_x64_${{ env.APP_VERSION }}
           path: artifact\
