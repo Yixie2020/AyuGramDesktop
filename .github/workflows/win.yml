@@ -34,7 +34,7 @@ jobs:
       - name: Clone.
         shell: cmd
         run: |
-          git clone --depth 1 --recurse-submodules --shallow-submodules https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git %TBUILD%\%REPO_NAME%
+          git clone --depth 1 --recurse-submodules --shallow-submodules --branch %GITHUB_REF_NAME% https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git %TBUILD%\%REPO_NAME%
 
       - name: First set up.
         shell: bash
