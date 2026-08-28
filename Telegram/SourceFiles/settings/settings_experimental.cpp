@@ -64,11 +64,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QJsonDocument>
 #include <QtGui/QGuiApplication>
 
-// AyuGram includes
-#include "ayu/ui/settings/settings_main.h"
-#include "settings/settings_builder.h"
-
-
 namespace Settings {
 namespace {
 
@@ -77,11 +72,6 @@ const auto kOptionsClipboardPrefix = u"tdesktop-flags:"_q;
 struct DecodeOptionsResult {
 	bool ok = false;
 	QString json;
-};
-
-struct ResolvedReferrer {
-	QString controlId;
-	Type section = AyuMain::Id();
 };
 
 [[nodiscard]] QString EncodeOptionsToText(const QString &json) {
@@ -118,51 +108,6 @@ struct ResolvedReferrer {
 	result.ok = true;
 	result.json = QString::fromUtf8(decoded);
 	return result;
-}
-
-[[nodiscard]] ResolvedReferrer ResolveReferrer(
-		const QString &controlId,
-		not_null<Main::Session*> session) {
-	const auto &registry = Builder::SearchRegistry::Instance();
-	const auto entries = registry.collectAll(session);
-	for (const auto &entry : entries) {
-		if (!entry.section) {
-			continue;
-		}
-		if (entry.id == controlId) {
-			return {
-				.controlId = entry.id,
-				.section = entry.section,
-			};
-		}
-		if (entry.altIds.contains(controlId)) {
-			return {
-				.controlId = entry.id,
-				.section = entry.section,
-			};
-		}
-	}
-	return {
-		.controlId = controlId,
-	};
-}
-
-[[nodiscard]] QString OptionReferrer(const base::options::option<bool> &option) {
-	const auto &id = option.id();
-	if (id == u"tabbed-panel-show-on-click"_q) {
-		return u"ayu/showEmojiPopup"_q;
-	} else if (id == u"show-peer-id-below-about"_q) {
-		return u"ayu/showPeerId"_q;
-	} else if (id == u"use-small-msg-bubble-radius"_q) {
-		return u"ayu/messageBubbleRadius"_q;
-	} else if (id == u"unlimited-recent-stickers"_q) {
-		return u"ayu/unlimitedRecentStickers"_q;
-	} else if (id == u"hide-ai-button"_q) {
-		return u"ayu/showAiEditorButtonInMessageField"_q;
-	} else if (id == u"unlimited-message-width"_q) {
-		return u"ayu/wideMultiplier"_q;
-	}
-	return QString();
 }
 
 void SetupCopyDeepLink(
@@ -245,7 +190,6 @@ void SetupCopyDeepLink(
 
 QString AddOption(
 		not_null<Window::Controller*> window,
-		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container,
 		base::options::option<bool> &option,
 		rpl::producer<> resetClicks,
@@ -274,26 +218,14 @@ QString AddOption(
 		toggles->fire_copy(option.value());
 	}, lifetime);
 
-	const auto referrer = OptionReferrer(option);
 	const auto button = AddOptionRow(
 		inner,
 		name,
 		description,
-		(!referrer.isEmpty() || option.relevant())
+		(option.relevant()
 			? st::settingsButtonNoIcon
-			: st::settingsOptionDisabled);
-	if (!referrer.isEmpty()) {
-		button->addClickHandler([=] {
-			const auto resolved = ResolveReferrer(
-				referrer,
-				&controller->session());
-			controller->setHighlightControlId(resolved.controlId);
-			controller->showSettings(resolved.section);
-			window->activate();
-		});
-	} else {
-		button->toggleOn(toggles->events_starting_with(option.value()));
-	}
+			: st::settingsOptionDisabled)
+	)->toggleOn(toggles->events_starting_with(option.value()));
 
 	if (registerHighlight) {
 		registerHighlight(u"experimental/"_q + option.id(), button);
@@ -301,9 +233,7 @@ QString AddOption(
 
 	SetupCopyDeepLink(window, button, option.id());
 
-	const auto restarter = (referrer.isEmpty()
-		&& option.relevant()
-		&& option.restartRequired())
+	const auto restarter = (option.relevant() && option.restartRequired())
 		? button->lifetime().make_state<base::Timer>()
 		: nullptr;
 	if (restarter) {
@@ -316,21 +246,19 @@ QString AddOption(
 			}));
 		});
 	}
-	if (referrer.isEmpty()) {
-		button->toggledChanges(
-		) | rpl::on_next([=, &option](bool toggled) {
-			if (!option.relevant() && toggled != option.defaultValue()) {
-				toggles->fire_copy(option.defaultValue());
-				window->showToast(
-					tr::lng_settings_experimental_irrelevant(tr::now));
-				return;
-			}
-			option.set(toggled);
-			if (restarter) {
-				restarter->callOnce(st::settingsButtonNoIcon.toggle.duration);
-			}
-		}, inner->lifetime());
-	}
+	button->toggledChanges(
+	) | rpl::on_next([=, &option](bool toggled) {
+		if (!option.relevant() && toggled != option.defaultValue()) {
+			toggles->fire_copy(option.defaultValue());
+			window->showToast(
+				tr::lng_settings_experimental_irrelevant(tr::now));
+			return;
+		}
+		option.set(toggled);
+		if (restarter) {
+			restarter->callOnce(st::settingsButtonNoIcon.toggle.duration);
+		}
+	}, inner->lifetime());
 
 	const auto searchable = name + ' ' + description;
 	const auto terms = SearchWords(searchable);
@@ -402,7 +330,6 @@ QString AddFavoriteLinkButton(
 
 void SetupExperimental(
 		not_null<Window::Controller*> window,
-		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container,
 		rpl::producer<> reloadOptionsRequests,
 		rpl::producer<QString> query,
@@ -541,7 +468,6 @@ void SetupExperimental(
 			const char name[]) {
 		return AddOption(
 			window,
-			controller,
 			inner,
 			base::options::lookup<bool>(name),
 			(reset
@@ -697,7 +623,6 @@ void Experimental::setupContent() {
 
 	SetupExperimental(
 		&controller()->window(),
-		controller(),
 		content,
 		_reloadOptionsRequests.events(),
 		_query.value(),
