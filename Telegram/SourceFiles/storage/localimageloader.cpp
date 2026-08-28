@@ -45,13 +45,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QBuffer>
 #include <QtGui/QImageWriter>
 
-// AyuGram includes
-#include "ayu/utils/telegram_helpers.h"
-
-
 namespace {
 
-constexpr auto kThumbnailQuality = 95;
+constexpr auto kThumbnailQuality = 87;
 constexpr auto kThumbnailSize = 320;
 constexpr auto kPhotoUploadPartSize = 32 * 1024;
 constexpr auto kRecompressAfterBpp = 4;
@@ -153,10 +149,9 @@ struct PreparedFileThumbnail {
 		uint64 randomId) {
 	auto caption = item->originalText();
 	TextUtilities::Trim(caption);
-	const auto captionNormalized = reverseLocalPremiumEmoji(caption, item->history());
 	auto sentEntities = Api::EntitiesToMTP(
 		&item->history()->session(),
-		captionNormalized.entities,
+		caption.entities,
 		Api::ConvertOption::SkipLocal);
 	const auto flags = !sentEntities.v.isEmpty()
 		? MTPDinputSingleMedia::Flag::f_entities
@@ -204,7 +199,7 @@ struct PreparedFileThumbnail {
 	auto result = QByteArray();
 	QBuffer buffer(&result);
 	QImageWriter writer(&buffer, "JPEG");
-	writer.setQuality(95);
+	writer.setQuality(87);
 	writer.setProgressiveScanWrite(true);
 	writer.write(full);
 	buffer.close();

@@ -74,12 +74,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtCore/QBuffer>
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
-#include "ayu/utils/telegram_helpers.h"
-#include "styles/style_info.h"
-
-
 namespace Settings {
 namespace {
 
@@ -100,7 +94,7 @@ struct InformationHighlightTargets {
 };
 
 constexpr auto kSaveBioTimeout = 1000;
-constexpr auto kPlayStatusLimit = 12;
+constexpr auto kPlayStatusLimit = 2;
 
 class ComposedBadge final : public Ui::RpWidget {
 public:
@@ -116,11 +110,9 @@ private:
 	rpl::variable<QString> _text;
 	rpl::event_stream<int> _unreadWidth;
 	rpl::event_stream<int> _premiumWidth;
-	rpl::event_stream<int> _exteraWidth;
 
 	QPointer<Ui::RpWidget> _unread;
 	Info::Profile::Badge _badge;
-	Info::Profile::Badge _exteraBadge;
 
 };
 
@@ -139,18 +131,9 @@ ComposedBadge::ComposedBadge(
 		session,
 		Info::Profile::BadgeContentForPeer(session->user()),
 		nullptr,
-		animationPaused,
-		kPlayStatusLimit,
-		Info::Profile::BadgeType::Premium)
-, _exteraBadge(
-		this,
-		st::infoPeerBadge,
-		session,
-		ExteraBadgeTypeFromPeer(session->user()),
-		nullptr,
 		std::move(animationPaused),
-		0,
-		Info::Profile::BadgeType::Extera | Info::Profile::BadgeType::ExteraSupporter | Info::Profile::BadgeType::ExteraCustom) {
+		kPlayStatusLimit,
+		Info::Profile::BadgeType::Premium) {
 	if (hasUnread) {
 		_unread = Badge::CreateUnread(this, rpl::single(
 			rpl::empty
@@ -181,16 +164,6 @@ ComposedBadge::ComposedBadge(
 		}
 	}, lifetime());
 
-	_exteraBadge.updated(
-	) | rpl::on_next([=] {
-		if (const auto widget = _exteraBadge.widget()) {
-			widget->widthValue(
-			) | rpl::start_to_stream(_exteraWidth, widget->lifetime());
-		} else {
-			_exteraWidth.fire(0);
-		}
-	}, lifetime());
-
 	auto textWidth = _text.value() | rpl::map([=] {
 		return button->fullTextWidth();
 	});
@@ -199,15 +172,11 @@ ComposedBadge::ComposedBadge(
 		_premiumWidth.events_starting_with(_badge.widget()
 			? _badge.widget()->width()
 			: 0),
-		_exteraWidth.events_starting_with(_exteraBadge.widget()
-			? _exteraBadge.widget()->width()
-			: 0),
 		std::move(textWidth),
 		button->sizeValue()
 	) | rpl::on_next([=](
 			int unreadWidth,
 			int premiumWidth,
-			int exteraWidth,
 			int textWidth,
 			const QSize &buttonSize) {
 		const auto &st = button->st();
@@ -215,14 +184,7 @@ ComposedBadge::ComposedBadge(
 		const auto textRightPosition = st.padding.left()
 			+ textWidth
 			+ skip;
-		const auto exteraGap = exteraWidth
-			? st::infoVerifiedCheckPosition.x()
-			: 0;
-		const auto minWidth = unreadWidth
-			+ premiumWidth
-			+ exteraGap
-			+ exteraWidth
-			+ skip;
+		const auto minWidth = unreadWidth + premiumWidth + skip;
 		const auto maxTextWidth = buttonSize.width()
 			- minWidth
 			- st.padding.right();
@@ -235,10 +197,6 @@ ComposedBadge::ComposedBadge(
 
 		_badge.move(
 			0,
-			st.padding.top(),
-			buttonSize.height() - st.padding.top());
-		_exteraBadge.move(
-			premiumWidth,
 			st.padding.top(),
 			buttonSize.height() - st.padding.top());
 		if (_unread) {
@@ -309,7 +267,6 @@ void SetupPhoto(
 		not_null<Window::SessionController*> controller,
 		not_null<UserData*> self,
 		InformationHighlightTargets *targets) {
-	Ui::AddSkip(container); // fix avatar cutting on top
 	const auto wrap = container->add(object_ptr<Ui::FixedHeightWidget>(
 		container,
 		st::settingsInfoPhotoHeight));
@@ -651,9 +608,10 @@ void SetupRows(
 		targets->name = nameButton;
 	}
 
-	const auto copyPhone = [=] {
-		QGuiApplication::clipboard()->setText(self->phone());
-		controller->showToast(tr::lng_text_copied(tr::now), 500);
+	const auto showChangePhone = [=] {
+		controller->show(
+			Ui::MakeInformBox(tr::lng_change_phone_error()));
+		controller->window().activate();
 	};
 	const auto phoneButton = AddRow(
 		container,
@@ -662,7 +620,7 @@ void SetupRows(
 			self,
 			Info::Profile::PhoneValue(self)),
 		tr::lng_profile_copy_phone(tr::now),
-		copyPhone,
+		showChangePhone,
 		{ &st::menuIconPhone },
 		true,
 		[=](not_null<Ui::PopupMenu*> menu) {
@@ -943,7 +901,7 @@ void SetupAccountsWrap(
 			pen.setWidthF(line);
 			p.setPen(pen);
 			p.setBrush(Qt::NoBrush);
-			AyuUserpic::PaintShape(p, rect);
+			p.drawEllipse(rect);
 		}
 	}, state->userpic.lifetime());
 

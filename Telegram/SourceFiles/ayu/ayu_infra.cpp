@@ -8,6 +8,7 @@
 
 #include "ayu/ayu_lang.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/ayu_ui_settings.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/data/ayu_database.h"
 #include "ayu/ui/ayu_logo.h"
@@ -35,6 +36,11 @@ void initLang() {
 
 void initUiSettings() {
 	const auto &settings = AyuSettings::getInstance();
+
+	AyuUiSettings::setMonoFont(settings.monoFont());
+	AyuUiSettings::setWideMultiplier(settings.wideMultiplier());
+	AyuUiSettings::setMaterialSwitches(settings.materialSwitches());
+	AyuUiSettings::setAvatarCorners(settings.avatarCorners());
 	Ui::SetAppliedBubbleRadius(settings.messageBubbleRadius());
 }
 

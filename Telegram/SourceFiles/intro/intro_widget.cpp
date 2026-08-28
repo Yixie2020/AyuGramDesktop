@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "intro/intro_widget.h"
 
+#include "intro/intro_start.h"
 #include "intro/intro_phone.h"
 #include "intro/intro_qr.h"
 #include "intro/intro_code.h"
@@ -46,10 +47,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_intro.h"
 #include "base/qt/qt_common_adapters.h"
-
-// AyuGram includes
-#include "boxes/about_box.h"
-
 
 namespace Intro {
 namespace {
@@ -95,7 +92,6 @@ Widget::Widget(
 , _next(
 	this,
 	object_ptr<Ui::RoundButton>(this, nullptr, *_nextStyle))
-, _footer(this, st::introFooter)
 , _connecting(std::make_unique<Window::ConnectionState>(
 		this,
 		account,
@@ -112,6 +108,10 @@ Widget::Widget(
 	}, lifetime());
 
 	switch (point) {
+	case EnterPoint::Start:
+		getNearestDC();
+		appendStep(new StartWidget(this, _account, getData()));
+		break;
 	case EnterPoint::Phone:
 		appendStep(new PhoneWidget(this, _account, getData()));
 		break;
@@ -178,8 +178,6 @@ Widget::Widget(
 			checkUpdateStatus();
 		}, lifetime());
 	}
-
-	_footer->setText(QString("AyuGram Desktop v%1").arg(currentVersionText()));
 }
 
 rpl::producer<> Widget::showSettingsRequested() const {
@@ -877,8 +875,6 @@ void Widget::updateControlsGeometry() {
 			(width() - _terms->width()) / 2,
 			height() - st::introTermsBottom - _terms->height());
 	}
-
-	_footer->move((width() - _footer->width()) / 2, height() - _footer->height() - st::lineWidth * 6);
 }
 
 void Widget::keyPressEvent(QKeyEvent *e) {
@@ -907,7 +903,7 @@ void Widget::backRequested() {
 		Core::App().domain().activate(parent);
 	} else {
 		moveToStep(
-			Ui::CreateChild<QrWidget>(this, _account, getData()),
+			Ui::CreateChild<StartWidget>(this, _account, getData()),
 			StackAction::Replace,
 			Animate::Back);
 	}

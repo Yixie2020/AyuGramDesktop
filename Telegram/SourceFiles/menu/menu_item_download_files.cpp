@@ -250,12 +250,6 @@ void AddDownloadFilesAction(
 			return;
 		}
 	}
-       std::sort(docs.begin(), docs.end(), [](const auto &a, const auto &b) {
-               return a.second < b.second;
-       });
-       std::sort(photos.begin(), photos.end(), [](const auto &a, const auto &b) {
-               return a.second < b.second;
-       });
 	const auto done = [weak = base::make_weak(list)] {
 		if (const auto strong = weak.get()) {
 			strong->cancelSelection();
@@ -279,12 +273,6 @@ void AddDownloadFilesAction(
 			return;
 		}
 	}
-       std::sort(docs.begin(), docs.end(), [](const auto &a, const auto &b) {
-               return a.second < b.second;
-       });
-       std::sort(photos.begin(), photos.end(), [](const auto &a, const auto &b) {
-               return a.second < b.second;
-       });
 	const auto done = [weak = base::make_weak(list)] {
 		if (const auto strong = weak.get()) {
 			strong->clearSelected();

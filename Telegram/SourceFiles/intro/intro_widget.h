@@ -94,6 +94,7 @@ class Step;
 } // namespace details
 
 enum class EnterPoint : uchar {
+	Start,
 	Phone,
 	Qr,
 };
@@ -211,8 +212,6 @@ private:
 	object_ptr<Ui::FadeWrap<Ui::LinkButton>> _changeLanguage = { nullptr };
 	object_ptr<Ui::FadeWrap<Ui::RoundButton>> _resetAccount = { nullptr };
 	object_ptr<Ui::FadeWrap<Ui::FlatLabel>> _terms = { nullptr };
-
-	object_ptr<Ui::FlatLabel> _footer;
 
 	std::unique_ptr<Window::ConnectionState> _connecting;
 

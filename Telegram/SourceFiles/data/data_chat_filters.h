@@ -266,8 +266,6 @@ private:
 	rpl::event_stream<FilterId> _moreChatsUpdated;
 	base::Timer _moreChatsTimer;
 
-	rpl::lifetime _lifetime;
-
 };
 
 [[nodiscard]] bool CanRemoveFromChatFilter(

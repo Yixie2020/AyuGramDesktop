@@ -20,11 +20,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "styles/style_dialogs.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/filters/filters_controller.h"
-
-
 namespace HistoryView {
 namespace {
 
@@ -65,10 +60,6 @@ bool SendActionPainter::updateNeedsAnimating(
 	using Type = Api::SendProgressType;
 	if (action.type() == mtpc_sendMessageCancelAction) {
 		clear(user);
-		return false;
-	}
-
-	if (FiltersController::isBlocked(user)) {
 		return false;
 	}
 

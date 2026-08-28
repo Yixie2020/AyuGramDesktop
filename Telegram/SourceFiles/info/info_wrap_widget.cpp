@@ -55,17 +55,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/filters/filters_cache_controller.h"
-#include "ayu/ui/settings/filters/edit_filter.h"
-#include "ayu/ui/settings/filters/settings_filters_list.h"
-#include "ayu/utils/telegram_helpers.h"
-#include "inline_bots/bot_attach_web_view.h"
-#include "styles/style_ayu_settings.h"
-#include "window/window_peer_menu.h"
-
-
 namespace Info {
 namespace {
 
@@ -467,53 +456,6 @@ void WrapWidget::setupTopBarMenuToggle() {
 					Ui::DefaultShowFillPeerQrBoxCallback(show, self);
 				});
 			}
-		} else if (section.settingsType() == ::Settings::AyuFiltersList::Id()) {
-			const auto controller = _controller->parentController();
-			const auto &st = st::filtersAddIcon;
-			const auto button = _topBar->addButton(base::make_unique_q<Ui::IconButton>(_topBar, st));
-
-			const auto show = controller->uiShow();
-			if (controller->shadowBan) {
-				auto types = InlineBots::PeerTypes();
-				types |= InlineBots::PeerType::Bot;
-				types |= InlineBots::PeerType::User;
-
-				button->addClickHandler([=]
-				{
-					Window::ShowChooseRecipientBox(
-						controller,
-						[=](not_null<Data::Thread*> thread)
-						{
-							const auto peer = thread->peer();
-							const auto realId = getDialogIdFromPeer(peer);
-
-							AyuSettings::getInstance().addShadowBan(realId);
-							return true;
-						},
-						tr::ayu_FiltersMenuSelectChat(),
-						nullptr,
-						types
-					);
-				});
-			} else {
-				button->addClickHandler([=]
-				{
-					show->show(::Settings::RegexEditBox(nullptr, nullptr, controller->dialogId));
-				});
-			}
-
-
-			if (controller->showExclude.has_value() && controller->showExclude.value()) {
-				auto icon = base::make_unique_q<Ui::IconButton>(_topBar, st::filtersExcludeIcon);
-
-				const auto excludeButton = _topBar->addButton(std::move(icon));
-				excludeButton->addClickHandler([=, content = _content.data()]
-				{
-					// open new
-					controller->showExclude = false;
-					controller->showSettings(::Settings::AyuFiltersList::Id());
-				});
-			}
 		}
 		setupShortcuts();
 	} else if (key.storiesPeer()
@@ -793,23 +735,6 @@ void WrapWidget::finishShowContent() {
 	_content->scrollBottomSkipValue(
 	) | rpl::on_next([=] {
 		updateContentGeometry();
-	}, _content->lifetime());
-
-	FiltersCacheController::updates() | rpl::on_next([=]
-	{
-		auto contentMemento = _content->createMemento();
-		if (!contentMemento) {
-			return;
-		}
-
-		std::vector<std::shared_ptr<ContentMemento>> stack;
-		stack.push_back(std::move(contentMemento));
-		const auto sectionMemento = std::make_shared<Memento>(std::move(stack));
-		const auto params = Window::SectionShow(
-			Window::SectionShow::Way::Backward,
-			anim::type::instant);
-
-		showInternal(sectionMemento.get(), params);
 	}, _content->lifetime());
 }
 

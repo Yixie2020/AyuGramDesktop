@@ -714,7 +714,6 @@ private:
 	[[nodiscard]] HistoryView::ElementOverlayHost &ensureOverlayHost();
 	std::unique_ptr<HistoryView::ElementOverlayHost> _overlayHost;
 
-	bool _wasForceClickPreview = false;
 	void setupThanosEffect();
 	void collapseGapsUpdated();
 	[[nodiscard]] const std::vector<CollapseGap> &collapseGaps() const;

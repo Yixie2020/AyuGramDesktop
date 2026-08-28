@@ -71,8 +71,4 @@ private:
 	bool _lastComplete = false;
 	int64 _nextRequestOffset = 0;
 
-	// AyuGram: captured at construction, so changing the boost
-	// setting mid-download can't corrupt offsets.
-	const int _partSize = Storage::DownloadPartSize();
-
 };

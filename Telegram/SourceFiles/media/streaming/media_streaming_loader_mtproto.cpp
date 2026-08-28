@@ -203,7 +203,7 @@ void LoaderMtproto::checkStats() {
 			durationCountedTill = till;
 		}
 		if (entry.end) {
-			received += Storage::DownloadPartSize();
+			received += Storage::kDownloadPartSize;
 		}
 	}
 	if (duration) {
@@ -212,7 +212,7 @@ void LoaderMtproto::checkStats() {
 				int64(received * 1000 / duration),
 				int64(0),
 				int64(64 * 1024 * 1024))),
-			.unreliable = (received < 3 * Storage::DownloadPartSize()),
+			.unreliable = (received < 3 * Storage::kDownloadPartSize),
 		});
 	}
 }

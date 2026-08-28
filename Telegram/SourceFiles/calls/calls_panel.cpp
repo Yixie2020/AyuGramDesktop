@@ -6,7 +6,6 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/calls_panel.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
 
 #include "boxes/peers/replace_boost_box.h" // CreateUserpicsWithMoreBadge
 #include "calls/calls_panel_background.h"
@@ -278,9 +277,6 @@ void Panel::savePanelGeometry() {
 }
 
 void Panel::initWindow() {
-	if (AyuFeatures::StreamerMode::isEnabled()) {
-		AyuFeatures::StreamerMode::hideWidgetWindow(window().get());
-	}
 	window()->setAttribute(Qt::WA_OpaquePaintEvent);
 	window()->setAttribute(Qt::WA_NoSystemBackground);
 	window()->setTitle(_user->name());
@@ -1305,25 +1301,30 @@ void Panel::updateControlsGeometry() {
 	const auto available = widget()->height()
 		- st::callBottomControlsHeight
 		- availableTop;
+	const auto bodyContentHeight = _bodySt->height
+		+ (_conferenceParticipants
+			? (_bodySt->participantsTop - _bodySt->statusTop)
+			: 0);
 	const auto bodyPreviewSizeMax = st::callOutgoingPreviewMin
 		+ ((st::callOutgoingPreview
 			- st::callOutgoingPreviewMin)
 			* (innerHeight - st::callHeightMin)
 			/ (st::callHeight - st::callHeightMin));
+	const auto bodyPreviewHeightMax = std::max(
+		available - bodyContentHeight - 3 * st::callOutgoingPreviewSkipMin,
+		st::callOutgoingPreviewMin.height());
 	const auto bodyPreviewSize = QSize(
 		std::min(
 			bodyPreviewSizeMax.width(),
 			std::min(innerWidth, st::callOutgoingPreviewMax.width())),
-		std::min(
+		std::min({
 			bodyPreviewSizeMax.height(),
-			st::callOutgoingPreviewMax.height()));
-	const auto bodyContentHeight = _bodySt->height
-		+ (_conferenceParticipants
-			? (_bodySt->participantsTop - _bodySt->statusTop)
-			: 0);
+			st::callOutgoingPreviewMax.height(),
+			bodyPreviewHeightMax,
+		}));
 	const auto contentHeight = bodyContentHeight
 		+ (_outgoingPreviewInBody ? bodyPreviewSize.height() : 0);
-	const auto remainingHeight = available - contentHeight;
+	const auto remainingHeight = std::max(available - contentHeight, 0);
 	const auto skipHeight = remainingHeight
 		/ (_outgoingPreviewInBody ? 3 : 2);
 

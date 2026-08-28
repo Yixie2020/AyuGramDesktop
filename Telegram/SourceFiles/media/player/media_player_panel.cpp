@@ -36,7 +36,7 @@ namespace {
 using ListWidget = Info::Media::ListWidget;
 
 constexpr auto kPlaylistIdsLimit = 32;
-constexpr auto kDelayedHideTimeout = crl::time(1800);
+constexpr auto kDelayedHideTimeout = crl::time(3000);
 
 } // namespace
 

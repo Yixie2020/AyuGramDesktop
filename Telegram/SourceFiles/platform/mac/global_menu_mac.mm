@@ -33,10 +33,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <Cocoa/Cocoa.h>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-
-
 namespace Platform {
 namespace {
 
@@ -74,17 +70,12 @@ private:
 	void buildAppleMenu(QMenu *main);
 	void buildFileMenu(QMenu *file);
 	void buildEditMenu(QMenu *edit);
-
-	void buildGhostModeMenu(QMenu *ghostMode);
-
 	void buildWindowMenu(QMenu *window);
 	void retranslate();
 	void ensureLanguageBound();
 	void recomputeState();
 	[[nodiscard]] bool clipboardHasText();
 	[[nodiscard]] Window::Controller *resolveActiveWindow() const;
-
-	[[nodiscard]] GhostModeAccountSettings *resolveGhostSettings() const;
 
 	template <typename Callback>
 	void withActiveWindow(Callback callback) {
@@ -129,11 +120,6 @@ private:
 	QAction *_monospace = nullptr;
 	QAction *_clearFormat = nullptr;
 
-	QMenu *_ghostModeMenu = nullptr;
-	QAction *_ghostMode = nullptr;
-	QAction *_readOnInteract = nullptr;
-	QAction *_scheduleMessages = nullptr;
-
 	NSPasteboard *_pasteboard = nullptr;
 	int _pasteboardChangeCount = -1;
 	bool _pasteboardHasText = false;
@@ -177,15 +163,6 @@ Window::Controller *Manager::resolveActiveWindow() const {
 	}
 	const auto active = Core::App().activeWindow();
 	return active ? active : Core::App().activePrimaryWindow();
-}
-
-GhostModeAccountSettings *Manager::resolveGhostSettings() const {
-	const auto window = resolveActiveWindow();
-	if (!window || window->locked()) {
-		return nullptr;
-	}
-	const auto session = window->maybeSession();
-	return session ? &AyuSettings::ghost(session) : nullptr;
 }
 
 bool Manager::clipboardHasText() {
@@ -247,24 +224,6 @@ void Manager::retranslate() {
 	}
 	if (_clearFormat) {
 		_clearFormat->setText(tr::lng_menu_formatting_clear(tr::now));
-	}
-	if (_ghostModeMenu) {
-		_ghostModeMenu->setTitle(tr::ayu_CategoryGhostMode(tr::now));
-	}
-	if (_ghostMode) {
-		if (const auto ghost = resolveGhostSettings()) {
-			_ghostMode->setText(ghost->isGhostModeActive()
-				? tr::ayu_DisableGhostMode(tr::now)
-				: tr::ayu_EnableGhostMode(tr::now));
-		} else {
-			_ghostMode->setText(tr::ayu_EnableGhostMode(tr::now));
-		}
-	}
-	if (_readOnInteract) {
-		_readOnInteract->setText(tr::ayu_MarkReadAfterAction(tr::now));
-	}
-	if (_scheduleMessages) {
-		_scheduleMessages->setText(tr::ayu_UseScheduledMessages(tr::now));
 	}
 }
 
@@ -386,39 +345,17 @@ void Manager::recomputeState() {
 		_monospace,
 		disabled(Field::kTagPre) || disabled(Field::kTagCode));
 	ForceDisabled(_clearFormat, markdownState.disabled());
-
-	const auto ghost = resolveGhostSettings();
-	const auto ghostInactive = (ghost == nullptr);
-	ForceDisabled(_ghostMode, ghostInactive);
-	ForceDisabled(_readOnInteract, ghostInactive);
-	ForceDisabled(_scheduleMessages, ghostInactive);
-	const auto setChecked = [](QAction *action, bool checked) {
-		const auto wasBlocked = action->blockSignals(true);
-		action->setChecked(checked);
-		action->blockSignals(wasBlocked);
-	};
-	if (ghost) {
-		_ghostMode->setText(ghost->isGhostModeActive()
-			? tr::ayu_DisableGhostMode(tr::now)
-			: tr::ayu_EnableGhostMode(tr::now));
-		setChecked(_readOnInteract, ghost->markReadAfterAction());
-		setChecked(_scheduleMessages, ghost->useScheduledMessages());
-	} else {
-		_ghostMode->setText(tr::ayu_EnableGhostMode(tr::now));
-		setChecked(_readOnInteract, false);
-		setChecked(_scheduleMessages, false);
-	}
 }
 
 void Manager::buildAppleMenu(QMenu *main) {
 	{
 		auto callback = [this] {
 			withActiveWindow([](not_null<Window::Controller*> window) {
-				window->show(Box(AboutBox, window->sessionController()));
+				window->show(Box(AboutBox));
 			});
 		};
 		const auto about = main->addAction(
-			u"About AyuGram"_q,
+			u"About Telegram"_q,
 			std::move(callback));
 		about->setMenuRole(QAction::AboutQtRole);
 	}
@@ -577,64 +514,6 @@ void Manager::buildEditMenu(QMenu *edit) {
 	}
 }
 
-void Manager::buildGhostModeMenu(QMenu *ghostMode) {
-	_ghostModeMenu = ghostMode;
-	QObject::connect(ghostMode, &QMenu::aboutToShow, ghostMode, [this] {
-		requestUpdate();
-	});
-
-	const auto addToggle = [&](QString text, auto callback) {
-		const auto action = ghostMode->addAction(std::move(text));
-		action->setCheckable(true);
-		QObject::connect(
-			action,
-			&QAction::triggered,
-			action,
-			[this, callback = std::move(callback)](bool checked) {
-				callback(checked);
-				requestUpdate();
-			});
-		return action;
-	};
-
-	_ghostMode = ghostMode->addAction(u"Enable Ghost"_q);
-	QObject::connect(
-		_ghostMode,
-		&QAction::triggered,
-		_ghostMode,
-		[this] {
-			if (const auto ghost = resolveGhostSettings()) {
-				ghost->setGhostModeEnabled(!ghost->isGhostModeActive());
-			}
-			requestUpdate();
-		});
-
-	ghostMode->addSeparator();
-
-	_readOnInteract = addToggle(
-		u"Read on Interact"_q,
-		[this](bool enabled) {
-			if (const auto ghost = resolveGhostSettings()) {
-				ghost->setMarkReadAfterAction(enabled);
-				if (enabled) {
-					ghost->setUseScheduledMessages(false);
-				}
-			}
-		});
-
-	_scheduleMessages = addToggle(
-		u"Schedule Messages"_q,
-		[this](bool enabled) {
-			if (const auto ghost = resolveGhostSettings()) {
-				ghost->setUseScheduledMessages(enabled);
-				if (enabled) {
-					ghost->setMarkReadAfterAction(false);
-				}
-			}
-		});
-
-}
-
 void Manager::buildWindowMenu(QMenu *window) {
 	const auto receiver = _menuBar.get();
 	_fullScreen = window->addAction(
@@ -720,12 +599,9 @@ void Manager::buildWindowMenu(QMenu *window) {
 }
 
 void Manager::buildMenu() {
-	buildAppleMenu(_menuBar->addMenu(u"AyuGram"_q));
+	buildAppleMenu(_menuBar->addMenu(u"Telegram"_q));
 	buildFileMenu(_menuBar->addMenu(u"File"_q));
 	buildEditMenu(_menuBar->addMenu(u"Edit"_q));
-
-	buildGhostModeMenu(_menuBar->addMenu(u"Ghost Mode"_q));
-
 	buildWindowMenu(_menuBar->addMenu(u"Window"_q));
 }
 
@@ -756,8 +632,6 @@ void Manager::destroy() {
 		= _bold = _italic = _underline
 		= _strikeOut = _blockquote = _monospace = _clearFormat
 		= nullptr;
-	_ghostModeMenu = nullptr;
-	_ghostMode = _readOnInteract = _scheduleMessages = nullptr;
 	_pasteboard = nullptr;
 	_pasteboardChangeCount = -1;
 	_pasteboardHasText = false;

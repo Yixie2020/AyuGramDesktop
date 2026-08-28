@@ -120,7 +120,7 @@ bool prependPseudoReply(
 	TextWithTags &caption,
 	FullReplyTo &replyTo);
 
-void getRegistrationDate(not_null<PeerData*> peer, Fn<void(TextWithEntities)> callback, PeerData *contextPeer = nullptr);
+void getRegistrationDate(not_null<PeerData*> peer, Fn<void(TextWithEntities)> callback);
 
 QString getBetterLinkPreview(const QString &url);
 

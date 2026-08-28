@@ -60,7 +60,6 @@ public:
 		bool monochrome,
 		bool supportMode);
 	[[nodiscard]] static QString QuitJumpListIconPath();
-	[[nodiscard]] static QString GhostJumpListIconPath();
 
 private:
 	base::unique_qptr<QPlatformSystemTrayIcon> _icon;

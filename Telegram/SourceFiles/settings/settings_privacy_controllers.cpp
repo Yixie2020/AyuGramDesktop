@@ -10,7 +10,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_global_privacy.h"
 #include "api/api_peer_photo.h"
 #include "apiwrap.h"
-#include "ayu/ui/ayu_userpic.h"
 #include "base/call_delayed.h"
 #include "base/event_filter.h"
 #include "base/unixtime.h"
@@ -1189,7 +1188,7 @@ object_ptr<Ui::RpWidget> ProfilePhotoPrivacyController::setupMiddleWidget(
 				Qt::SmoothTransformation);
 			result = Images::Round(
 				std::move(result),
-				Images::CornersMask(AyuUserpic::ComputeRadius(userpicSize.width())));
+				ImageRoundRadius::Ellipse);
 			result.setDevicePixelRatio(style::DevicePixelRatio());
 			(local ? localPhoto : photo) = std::move(result);
 			if (local) {

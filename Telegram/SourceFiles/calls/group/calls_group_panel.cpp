@@ -6,7 +6,6 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/group/calls_group_panel.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
 
 #include "calls/group/calls_group_common.h"
 #include "calls/group/calls_group_invite_controller.h"
@@ -366,9 +365,6 @@ void Panel::chooseSourceStop() {
 }
 
 void Panel::initWindow() {
-	if (AyuFeatures::StreamerMode::isEnabled()) {
-		AyuFeatures::StreamerMode::hideWidgetWindow(window().get());
-	}
 	window()->setAttribute(Qt::WA_OpaquePaintEvent);
 	window()->setAttribute(Qt::WA_NoSystemBackground);
 	window()->setTitleStyle(st::groupCallTitle);

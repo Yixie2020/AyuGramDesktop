@@ -439,9 +439,6 @@ private:
 	Api::PeerSearch _peerSearch;
 	Api::SingleMessageSearch _singleMessageSearch;
 
-	std::vector<not_null<PeerData*>> _idSearchResults;
-	QString _idSearchQuery;
-
 	QPixmap _widthAnimationCache;
 
 	int _topDelta = 0;

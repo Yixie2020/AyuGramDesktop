@@ -61,7 +61,6 @@ enum class SearchEntryCheckIcon {
 };
 struct SearchEntry {
 	QString id;
-	QStringList altIds;
 	QString title;
 	QStringList keywords;
 	Type section;
@@ -82,14 +81,10 @@ struct SearchIndexerEntry {
 	SearchEntriesIndexer indexer;
 };
 
-using SectionTitle = std::variant<
-	not_null<const tr::phrase<>*>,
-	QString>;
-
 struct SectionMeta {
 	Type id;
 	Type parentId;
-	SectionTitle title;
+	not_null<const tr::phrase<>*> title;
 	not_null<const style::icon*> icon;
 };
 
@@ -176,7 +171,6 @@ public:
 	struct ControlArgs {
 		Fn<object_ptr<Ui::RpWidget>(not_null<Ui::VerticalLayout*>)> factory;
 		QString id;
-		QStringList altIds;
 		rpl::producer<QString> title;
 		style::margins margin;
 		style::align align = style::al_left;
@@ -191,7 +185,6 @@ public:
 
 	struct ButtonArgs {
 		QString id;
-		QStringList altIds;
 		rpl::producer<QString> title;
 		const style::SettingsButton *st = nullptr;
 		IconDescriptor icon;
@@ -207,7 +200,6 @@ public:
 
 	struct SectionArgs {
 		//QString id; // Sections should register themselves in search.
-		QStringList altIds;
 		rpl::producer<QString> title;
 		Type targetSection;
 		IconDescriptor icon;
@@ -217,7 +209,6 @@ public:
 
 	struct PremiumButtonArgs {
 		QString id;
-		QStringList altIds;
 		rpl::producer<QString> title;
 		rpl::producer<QString> label;
 		bool credits = false;
@@ -228,7 +219,6 @@ public:
 
 	struct PrivacyButtonArgs {
 		QString id;
-		QStringList altIds;
 		rpl::producer<QString> title;
 		Api::UserPrivacy::Key key;
 		Fn<std::unique_ptr<EditPrivacyController>()> controllerFactory;
@@ -239,7 +229,6 @@ public:
 
 	struct CheckboxArgs {
 		QString id;
-		QStringList altIds;
 		rpl::producer<QString> title;
 		bool checked = false;
 		QStringList keywords;
@@ -250,7 +239,6 @@ public:
 
 	struct SubsectionTitleArgs {
 		QString id;
-		QStringList altIds;
 		rpl::producer<QString> title;
 		QStringList keywords;
 	};

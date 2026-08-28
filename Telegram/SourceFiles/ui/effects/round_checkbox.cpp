@@ -18,10 +18,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QCoreApplication>
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
-
-
 namespace Ui {
 namespace {
 
@@ -463,7 +459,7 @@ void RoundImageCheckbox::paintFrame(
 				segments ? _segments.front().width : _st.selectWidth);
 			p.setPen(pen);
 			if (!radius) {
-				AyuUserpic::PaintShape(p, outline);
+				p.drawEllipse(outline);
 			} else {
 				p.drawRoundedRect(outline, *radius, *radius);
 			}

@@ -58,10 +58,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "styles/style_info.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-
-
 namespace Info {
 namespace Profile {
 
@@ -89,12 +85,14 @@ void AddSavedMusic(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			layout,
 			object_ptr<Ui::VerticalLayout>(layout)));
+	Info::Saved::SetupSavedMusic(
+		wrap->entity(),
+		controller,
+		peer,
+		std::move(topBarColor));
+	using namespace rpl::mappers;
 	wrap->toggleOn(
-		Info::Saved::SetupSavedMusic(
-			wrap->entity(),
-			controller,
-			peer,
-			std::move(topBarColor)),
+		wrap->entity()->heightValue() | rpl::map(_1 > 0),
 		anim::type::instant);
 }
 
@@ -346,8 +344,7 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 			if (const auto user = _peer->asUser()) {
 				tabs.push_back(MakeCommonGroupsTabDescriptor(user));
 			}
-			if ((_peer->asBot() || _peer->asBroadcast())
-				&& !AyuSettings::getInstance().hideSimilarChannels()) {
+			if (_peer->asBot() || _peer->asBroadcast()) {
 				tabs.push_back(MakeSimilarPeersTabDescriptor(_peer));
 			}
 		}

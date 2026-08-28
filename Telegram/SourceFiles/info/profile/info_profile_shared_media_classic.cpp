@@ -34,10 +34,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "styles/style_info.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-
-
 namespace Info::Profile {
 namespace {
 
@@ -291,9 +287,6 @@ object_ptr<Ui::SlideWrap<Ui::RpWidget>> SetupSharedMediaClassic(
 	const auto addSimilarPeersButton = [&](
 			not_null<PeerData*> peer,
 			const style::icon &icon) {
-		if (AyuSettings::getInstance().hideSimilarChannels()) {
-			return;
-		}
 		auto result = AddSimilarPeersButton(
 			content,
 			controller,

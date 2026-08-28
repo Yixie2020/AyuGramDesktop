@@ -11,8 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h" // History::session
 #include "history/history_item.h" // HistoryItem::originalText
 #include "history/history_item_helpers.h" // DropDisallowedCustomEmoji
-#include "data/data_chat.h"
-#include "data/data_channel.h"
 #include "base/unixtime.h"
 #include "base/qthelp_regex.h"
 #include "base/qthelp_url.h"
@@ -68,10 +66,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QClipboard>
 #include <QtWidgets/QApplication>
 
-// AyuGram includes
-#include "ayu/features/forward/ayu_forward.h"
-
-
 namespace {
 
 using namespace Ui::Text;
@@ -79,7 +73,7 @@ using namespace Ui::Text;
 using EditLinkAction = Ui::InputField::EditLinkAction;
 using EditLinkSelection = Ui::InputField::EditLinkSelection;
 
-constexpr auto kParseLinksTimeout = crl::time(500);
+constexpr auto kParseLinksTimeout = crl::time(1000);
 constexpr auto kTypesDuration = 4 * crl::time(1000);
 constexpr auto kCodeLanguageLimit = 32;
 
@@ -1247,16 +1241,9 @@ base::unique_qptr<Ui::RpWidget> CreateDisabledFieldView(
 		QWidget *toastParent) {
 	auto result = base::make_unique_q<Ui::AbstractButton>(parent);
 	const auto raw = result.get();
-	const auto isForbidden = (peer->isChat() && peer->asChat()->isForbidden())
-		|| (peer->isChannel() && peer->asChannel()->isForbidden());
-	auto labelText = isForbidden
-		? ((peer->isMegagroup() || peer->isChat())
-			? tr::lng_group_not_accessible()
-			: tr::lng_channel_not_accessible())
-		: tr::lng_send_text_no();
 	const auto label = CreateChild<Ui::FlatLabel>(
 		result.get(),
-		std::move(labelText),
+		tr::lng_send_text_no(),
 		st::historySendDisabled);
 	label->setAttribute(Qt::WA_TransparentForMouseEvents);
 	raw->setPointerCursor(false);
@@ -1425,69 +1412,6 @@ std::unique_ptr<Ui::AbstractButton> BoostsToLiftWriteRestriction(
 		const auto window = show->resolveWindow();
 		window->resolveBoostState(peer->asChannel(), boosts);
 	});
-	return result;
-}
-
-std::unique_ptr<Ui::AbstractButton> AyuForwardWriteRestriction(
-	not_null<QWidget *> parent,
-	const PeerId &peer,
-	const Main::Session &session) {
-	using namespace Ui;
-
-	// status and part
-	const auto pair = AyuForward::stateName(peer);
-
-	auto result = std::make_unique<FlatButton>(
-		parent,
-		QString(),
-		st::historyComposeButton);
-	const auto raw = result.get();
-
-	const auto title = CreateChild<FlatLabel>(
-		raw,
-		pair.first,
-		st::frozenRestrictionTitle);
-	title->setTextColorOverride(st::historyComposeButton.color->c);
-
-
-	title->setAttribute(Qt::WA_TransparentForMouseEvents);
-	title->show();
-	const auto subtitle = CreateChild<FlatLabel>(
-		raw,
-		pair.second,
-		st::frozenRestrictionSubtitle);
-	subtitle->setAttribute(Qt::WA_TransparentForMouseEvents);
-	subtitle->show();
-
-
-	raw->sizeValue() | rpl::on_next([=](QSize size) {
-
-		const auto toggle = [&](auto &&widget, bool shown) {
-			if (widget->isHidden() == shown) {
-				widget->setVisible(shown);
-			}
-		};
-		const auto small = 2 * st::defaultDialogRow.photoSize;
-		const auto shown = (size.width() > small);
-
-		toggle(title, shown);
-		toggle(subtitle, shown);
-
-		const auto skip = st::defaultDialogRow.padding.left();
-		const auto available = size.width() - skip * 2;
-		title->resizeToWidth(available);
-		subtitle->resizeToWidth(available);
-		const auto height = title->height() + subtitle->height();
-		const auto top = (size.height() - height) / 2;
-		title->moveToLeft(skip, top, size.width());
-		subtitle->moveToLeft(skip, top + title->height(), size.width());
-
-	}, title->lifetime());
-
-	raw->setClickedCallback([&] {
-		AyuForward::cancelForward(peer, session);
-	});
-
 	return result;
 }
 

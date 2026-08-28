@@ -26,10 +26,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/toast/toast.h"
 #include "window/window_session_controller.h"
 
-// AyuGram includes
-#include "ayu/features/forward/ayu_forward.h"
-
-
 namespace {
 
 [[nodiscard]] ChatAdminRights ChatAdminRightsFlags(
@@ -239,9 +235,6 @@ bool CanSendAnyOf(
 		not_null<const PeerData*> peer,
 		ChatRestrictions rights,
 		bool forbidInForums) {
-	if (AyuForward::isForwarding(peer->id)) {
-		return false;
-	}
 	if (peer->session().frozen()
 		&& !peer->isFreezeAppealChat()) {
 		return false;
@@ -303,11 +296,6 @@ bool CanSendAnyOf(
 SendError RestrictionError(
 		not_null<PeerData*> peer,
 		ChatRestriction restriction) {
-	if (AyuForward::isForwarding(peer->id)) {
-		return SendError({
-			.text = AyuForward::stateName(peer->id).first + "\n" + AyuForward::stateName(peer->id).second,
-		});
-	}
 	using Flag = ChatRestriction;
 	if (peer->session().frozen()
 		&& !peer->isFreezeAppealChat()) {

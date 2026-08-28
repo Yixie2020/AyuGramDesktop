@@ -26,10 +26,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/sponsored_message_bar.h"
 #include "ui/text/text_utilities.h" // tr::rich.
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-
-
 namespace Data {
 namespace {
 
@@ -306,11 +302,6 @@ HistoryItem *SponsoredMessages::injectItem(
 }
 
 bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.disableAds()) {
-		return false;
-	}
-
 	if (history->peer->isChannel()) {
 		return true;
 	} else if (const auto user = history->peer->asUser()) {
@@ -320,21 +311,11 @@ bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
 }
 
 bool SponsoredMessages::canHaveFor(not_null<HistoryItem*> item) const {
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.disableAds()) {
-		return false;
-	}
-
 	return item->history()->peer->isBroadcast()
 		&& item->isRegular();
 }
 
 bool SponsoredMessages::isTopBarFor(not_null<History*> history) const {
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.disableAds()) {
-		return false;
-	}
-
 	if (peerIsUser(history->peer->id)) {
 		if (const auto user = history->peer->asUser()) {
 			return user->isBot();
@@ -518,11 +499,6 @@ void SponsoredMessages::parseForVideo(
 
 SponsoredForVideo SponsoredMessages::prepareForVideo(
 		not_null<PeerData*> peer) {
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.disableAds()) {
-		return {};
-	}
-
 	const auto i = _dataForVideo.find(peer);
 	if (i == end(_dataForVideo) || i->second.entries.empty()) {
 		return {};

@@ -24,7 +24,7 @@ namespace InlineBots {
 namespace Layout {
 namespace {
 
-constexpr auto kInlineBotRequestDelay = 350;
+constexpr auto kInlineBotRequestDelay = 400;
 
 } // namespace
 
@@ -39,7 +39,7 @@ Widget::Widget(
 , _shadow(st::emojiPanAnimation.shadow)
 , _scroll(this, st::inlineBotsScroll)
 , _innerRounding(Ui::PrepareCornerPixmaps(
-	ImageRoundRadius::Large,
+	ImageRoundRadius::Small,
 	st::emojiPanBg))
 , _inlineRequestTimer([=] { onInlineRequest(); }) {
 	resize(QRect(0, 0, st::emojiPanWidth, _contentHeight).marginsAdded(innerPadding()).size());
@@ -67,7 +67,7 @@ Widget::Widget(
 	style::PaletteChanged(
 	) | rpl::on_next([=] {
 		_innerRounding = Ui::PrepareCornerPixmaps(
-			ImageRoundRadius::Large,
+			ImageRoundRadius::Small,
 			st::emojiPanBg);
 	}, lifetime());
 
@@ -244,7 +244,7 @@ void Widget::startShowAnimation() {
 				inner.topLeft() * style::DevicePixelRatio(),
 				inner.size() * style::DevicePixelRatio()),
 			st::emojiPanRadius);
-		_showAnimation->setCornerMasks(Images::CornersMask(ImageRoundRadius::Large));
+		_showAnimation->setCornerMasks(Images::CornersMask(ImageRoundRadius::Small));
 		_showAnimation->start();
 	}
 	hideChildren();

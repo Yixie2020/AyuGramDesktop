@@ -20,11 +20,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h" // requestFullPeer.
 #include "styles/style_calls.h"
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
-#include "ui/image/image_prepare.h"
-
-
 namespace Calls {
 namespace {
 
@@ -105,15 +100,12 @@ void Userpic::paint() {
 		pen.setWidth(_muteStroke);
 		p.setPen(pen);
 		p.setBrush(st::callHangupBg);
-		const auto pos = AyuUserpic::OnlineBadgePosition(
-			size(),
-			_muteSize);
 		const auto rect = QRect(
-			int(std::round(pos.x())),
-			int(std::round(pos.y())),
+			_mutePosition.x() - _muteSize / 2,
+			_mutePosition.y() - _muteSize / 2,
 			_muteSize,
 			_muteSize);
-		AyuUserpic::PaintShape(p, QRectF(rect));
+		p.drawEllipse(rect);
 		st::callMutedPeerIcon.paintInCenter(p, rect);
 	}
 }
@@ -194,15 +186,12 @@ void Userpic::createCache(Image *image) {
 			height = qMax((height * real) / width, 1);
 			width = real;
 		}
-		auto result = image->pixNoCache(
+		_userPhoto = image->pixNoCache(
 			{ width, height },
 			{
+				.options = Images::Option::RoundCircle,
 				.outer = { size, size },
-			}).toImage();
-		result = Images::Round(
-			std::move(result),
-			Images::CornersMask(AyuUserpic::ComputeRadius(size)));
-		_userPhoto = Images::PixmapFast(std::move(result));
+			});
 		_userPhoto.setDevicePixelRatio(style::DevicePixelRatio());
 	} else {
 		auto filled = QImage(

@@ -1248,7 +1248,7 @@ void ShortcutMessages::edit(
 	if (!TextUtilities::CutPart(sending, left, maxTextSize)
 		&& !hasMediaWithCaption) {
 		if (item) {
-			_controller->show(Box<DeleteMessagesBox>(item, false));
+			_controller->show(Box<DeleteMessagesBox>(item));
 		} else {
 			doSetInnerFocus();
 		}
@@ -1355,8 +1355,7 @@ bool ShortcutMessages::confirmSendingFiles(
 		_composeControls->getTextWithAppliedMarkdown(),
 		_history->peer,
 		Api::SendType::Normal,
-		SendMenu::Details(),
-		[=](const TextWithTags &text) { _composeControls->setText(text); });
+		SendMenu::Details());
 
 	box->setConfirmedCallback(crl::guard(this, [=](
 			std::shared_ptr<Ui::PreparedBundle> bundle,

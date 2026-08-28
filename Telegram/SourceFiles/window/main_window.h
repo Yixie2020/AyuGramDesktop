@@ -35,9 +35,8 @@ class TitleWidget;
 struct TermsLock;
 struct SeparateId;
 
-[[nodiscard]] QImage Logo();
-[[nodiscard]] QImage LogoNoMargin();
-[[nodiscard]] const QImage &LogoTelegramDefault();
+[[nodiscard]] const QImage &Logo();
+[[nodiscard]] const QImage &LogoNoMargin();
 void OverrideApplicationIcon(QImage image);
 [[nodiscard]] QIcon CreateIcon(
 	Main::Session *session = nullptr,
@@ -196,6 +195,8 @@ protected:
 
 private:
 	void refreshTitleWidget();
+	void setupCanaryTitleLabel();
+	[[nodiscard]] QString nativeTitleSuffix() const;
 	void updateMinimumSize();
 	void updatePalette();
 

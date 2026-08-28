@@ -33,8 +33,8 @@ namespace Ui {
 namespace {
 
 constexpr auto kDaysInWeek = 7;
-constexpr auto kTooltipDelay = crl::time(350);
-constexpr auto kJumpDelay = 2 * crl::time(350);
+constexpr auto kTooltipDelay = crl::time(1000);
+constexpr auto kJumpDelay = 2 * crl::time(1000);
 
 // QDate -> 0..6
 [[nodiscard]] int DayOfWeekIndex(const QDate &date, int firstDayOfWeek) {

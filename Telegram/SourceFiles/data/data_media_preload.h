@@ -78,9 +78,6 @@ private:
 	bool _finished = false;
 	bool _failed = false;
 
-	// AyuGram: captured at construction for the download boost setting.
-	const int _partSize = Storage::DownloadPartSize();
-
 };
 
 } // namespace Data

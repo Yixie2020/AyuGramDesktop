@@ -55,10 +55,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_facade.h"
 #include "storage/storage_shared_media.h"
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
-
-
 namespace {
 
 constexpr auto kUpdateFullPeerTimeout = crl::time(5000); // Not more than once in 5 seconds.
@@ -120,19 +116,49 @@ UnavailableReason UnavailableReason::Sensitive() {
 QString UnavailableReason::Compute(
 		not_null<Main::Session*> session,
 		const std::vector<UnavailableReason> &list) {
-	return {};
+	const auto &skip = IgnoredReasons(session);
+	auto &&filtered = ranges::views::all(
+		list
+	) | ranges::views::filter([&](const Data::UnavailableReason &reason) {
+		return !reason.sensitive()
+			&& !ranges::contains(skip, reason.reason);
+	});
+	const auto first = filtered.begin();
+	return (first != filtered.end()) ? first->text : QString();
 }
 
 bool UnavailableReason::IgnoreSensitiveMark(
 		not_null<Main::Session*> session) {
-	return true;
+	return ranges::contains(
+			IgnoredReasons(session),
+			UnavailableReason::Sensitive().reason);
 }
 
 // We should get a full restriction in "{full}: {reason}" format and we
 // need to find an "-all" tag in {full}, otherwise ignore this restriction.
 std::vector<UnavailableReason> UnavailableReason::Extract(
 		const MTPvector<MTPRestrictionReason> *list) {
-	return {};
+	if (!list) {
+		return {};
+	}
+	return ranges::views::all(
+		list->v
+	) | ranges::views::filter([](const MTPRestrictionReason &restriction) {
+		return restriction.match([&](const MTPDrestrictionReason &data) {
+			const auto platform = data.vplatform().v;
+			return false
+#ifdef OS_MAC_STORE
+				|| (platform == "ios"_q)
+#elif defined OS_WIN_STORE // OS_MAC_STORE
+				|| (platform == "ms"_q)
+#endif // OS_MAC_STORE || OS_WIN_STORE
+				|| (platform == "all"_q);
+		});
+	}) | ranges::views::transform([](const MTPRestrictionReason &restriction) {
+		return restriction.match([&](const MTPDrestrictionReason &data) {
+			return UnavailableReason{ qs(data.vreason()), qs(data.vtext()) };
+		});
+	}) | ranges::to_vector;
 }
 
 bool ApplyBotMenuButton(
@@ -415,9 +441,9 @@ QImage *PeerData::userpicCloudImage(Ui::PeerUserpicView &view) const {
 		_userpicEmpty = nullptr;
 		return image;
 	} else if (isNotificationsUser()) {
-		static auto result = Window::LogoTelegramDefault().scaledToWidth(
+		static auto result = Window::LogoNoMargin().scaledToWidth(
 			kUserpicSize,
-			Qt::SmoothTransformation).convertToFormat(QImage::Format_RGB32);
+			Qt::SmoothTransformation);
 		return &result;
 	}
 	return nullptr;
@@ -488,14 +514,6 @@ QImage PeerData::GenerateUserpicImage(
 		Ui::PeerUserpicView &view,
 		int size,
 		std::optional<int> radius) {
-	if (!radius) {
-		const auto shape = peer->isForum()
-			? Ui::PeerUserpicShape::Forum
-			: Ui::PeerUserpicShape::Circle;
-		if (AyuUserpic::ShouldOverrideShape(shape)) {
-			radius = AyuUserpic::ComputeRadius(size);
-		}
-	}
 	if (const auto userpic = peer->userpicCloudImage(view)) {
 		auto image = userpic->scaled(
 			{ size, size },
@@ -1713,17 +1731,6 @@ void PeerData::processTopics(const MTPVector<MTPForumTopic> &topics) {
 	if (const auto forum = this->forum()) {
 		forum->applyReceivedTopics(topics);
 	}
-}
-
-bool PeerData::isAyuNoForwards() const {
-	if (const auto user = asUser()) {
-		return user->isAyuNoForwards();
-	} else if (const auto channel = asChannel()) {
-		return channel->isAyuNoForwards();
-	} else if (const auto chat = asChat()) {
-		return chat->isAyuNoForwards();
-	}
-	return true;
 }
 
 bool PeerData::allowsForwarding() const {

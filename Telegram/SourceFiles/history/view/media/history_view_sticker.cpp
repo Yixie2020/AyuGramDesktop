@@ -38,11 +38,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 #include "styles/style_menu_icons.h"
 
-// AyuGram includes
-#include "history/view/media/history_view_media.h"
-#include "ui/chat/message_bubble.h"
-
-
 namespace HistoryView {
 namespace {
 
@@ -349,19 +344,11 @@ void Sticker::paintAnimationFrame(
 	const auto &image = _lastFrameCached.isNull()
 		? frame.image
 		: _lastFrameCached;
-
-	const auto rounding = Ui::BubbleRounding{
-		.topLeft = Ui::BubbleCornerRounding::Small,
-		.topRight = Ui::BubbleCornerRounding::Small,
-		.bottomLeft = Ui::BubbleCornerRounding::Small,
-		.bottomRight = Ui::BubbleCornerRounding::Small,
-	};
-	auto prepared = (!_lastFrameCached.isNull() && context.selected())
+	const auto prepared = (!_lastFrameCached.isNull() && context.selected())
 		? Images::Colored(
 			base::duplicate(image),
 			context.st->msgStickerOverlay()->c)
 		: image;
-	prepared = Images::Round(std::move(prepared), MediaRoundingMask(rounding));
 	const auto size = prepared.size() / style::DevicePixelRatio();
 	p.drawImage(
 		QRect(
@@ -461,7 +448,6 @@ void Sticker::paintPath(
 }
 
 QPixmap Sticker::paintedPixmap(const PaintContext &context) const {
-	const auto roundOptions = Images::RoundOptions(ImageRoundRadius::Large);
 	auto helper = std::optional<style::owned_color>();
 	const auto sticker = _data->sticker();
 	const auto ratio = style::DevicePixelRatio();
@@ -483,7 +469,7 @@ QPixmap Sticker::paintedPixmap(const PaintContext &context) const {
 		? nullptr
 		: _dataMedia->getStickerLarge();
 	if (image) {
-		return image->pix(useSize, { .colored = colored, .options = roundOptions });
+		return image->pix(useSize, { .colored = colored });
 	//
 	// Inline thumbnails can't have alpha channel.
 	//
@@ -492,11 +478,11 @@ QPixmap Sticker::paintedPixmap(const PaintContext &context) const {
 	//		useSize,
 	//		{ .colored = colored, .options = Images::Option::Blur });
 	} else if (good) {
-		return good->pix(useSize, { .colored = colored, .options = roundOptions });
+		return good->pix(useSize, { .colored = colored });
 	} else if (const auto thumbnail = _dataMedia->thumbnail()) {
 		return thumbnail->pix(
 			useSize,
-			{ .colored = colored, .options = Images::Option::Blur | roundOptions });
+			{ .colored = colored, .options = Images::Option::Blur });
 	}
 	return QPixmap();
 }

@@ -39,11 +39,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "window/notifications_manager.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
-
-
 namespace {
 
 // User with hidden last seen stays online in UI for such amount of seconds.
@@ -373,24 +368,15 @@ void UserData::setName(
 		const QString &newLastName,
 		const QString &newPhoneName,
 		const QString &newUsername) {
-	auto filteredFirstName = newFirstName;
-	auto filteredLastName = newLastName;
+	bool changeName = !newFirstName.isEmpty() || !newLastName.isEmpty();
 
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.filterZalgo()) {
-		filteredFirstName = filterZalgo(filteredFirstName);
-		filteredLastName = filterZalgo(filteredLastName);
-	}
-
-	bool changeName = !filteredFirstName.isEmpty() || !filteredLastName.isEmpty();
-
-	if (changeName && filteredFirstName.trimmed().isEmpty()) {
-		firstName = filteredLastName;
+	if (changeName && newFirstName.trimmed().isEmpty()) {
+		firstName = newLastName;
 		lastName = QString();
 	} else {
 		if (changeName) {
-			firstName = filteredFirstName;
-			lastName = filteredLastName;
+			firstName = newFirstName;
+			lastName = newLastName;
 		}
 	}
 	const auto newFullName = langFullName(firstName, lastName);
@@ -623,15 +609,6 @@ bool UserData::isFake() const {
 }
 
 bool UserData::isPremium() const {
-	if (id) {
-		const auto &settings = AyuSettings::getInstance();
-		if (settings.localPremium()) {
-			if (getSession(id.value)) {
-				return true;
-			}
-		}
-	}
-
 	return flags() & UserDataFlag::Premium;
 }
 
@@ -688,12 +665,8 @@ bool UserData::readDatesPrivate() const {
 }
 
 bool UserData::allowsForwarding() const {
-	return true;
-}
-
-bool UserData::isAyuNoForwards() const {
-	return (flags() & Flag::NoForwardsMyEnabled)
-		|| (flags() & Flag::NoForwardsPeerEnabled);
+	return !(flags() & Flag::NoForwardsMyEnabled)
+		&& !(flags() & Flag::NoForwardsPeerEnabled);
 }
 
 void UserData::setNoForwardsFlags(bool myEnabled, bool peerEnabled) {

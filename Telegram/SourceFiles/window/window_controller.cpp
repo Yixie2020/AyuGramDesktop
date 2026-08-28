@@ -37,12 +37,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/ayu_state.h"
-#include "data/data_story.h"
-
-
 namespace Window {
 namespace {
 
@@ -411,10 +405,10 @@ void Controller::clearSetupEmailLock() {
 void Controller::setupIntro(
 		Main::Account *accountBeforeIntro,
 		QPixmap oldContentCache) {
-	_widget.setupIntro(
-		Intro::EnterPoint::Qr,
-		accountBeforeIntro,
-		std::move(oldContentCache));
+	const auto point = Core::App().domain().maybeLastOrSomeAuthedAccount()
+		? Intro::EnterPoint::Qr
+		: Intro::EnterPoint::Start;
+	_widget.setupIntro(point, accountBeforeIntro, std::move(oldContentCache));
 }
 
 void Controller::setupMain(
@@ -600,38 +594,6 @@ Window::Adaptive &Controller::adaptive() const {
 }
 
 void Controller::openInMediaView(Media::View::OpenRequest &&request) {
-	if (request.story()) {
-		const auto story = not_null{ request.story() };
-		auto &ghost = AyuSettings::ghost(&story->session());
-		const auto suggestGhostMode = ghost.suggestGhostModeBeforeViewingStory()
-			&& ghost.sendReadStories()
-			&& !ghost.sendReadStoriesLocked()
-			&& !ghost.isGhostModeActive();
-		if (suggestGhostMode) {
-			const auto controller = request.controller();
-			const auto context = request.storiesContext();
-			show(Ui::MakeConfirmBox({
-				.text = tr::ayu_SuggestGhostModeStoryText(tr::now, tr::rich),
-				.confirmed = [=](Fn<void()> close) {
-					close();
-					AyuSettings::ghost(&story->session()).setGhostModeEnabled(true);
-					AyuState::setDisableGhostModeOnStoryClose(&story->session());
-					_openInMediaViewRequests.fire(
-						Media::View::OpenRequest(controller, story, context));
-				},
-				.cancelled = [=](Fn<void()> close) {
-					close();
-					_openInMediaViewRequests.fire(
-						Media::View::OpenRequest(controller, story, context));
-				},
-				.confirmText = tr::ayu_SuggestGhostModeStoryActionTextYes(),
-				.cancelText = tr::ayu_SuggestGhostModeStoryActionTextNo(),
-				.title = tr::ayu_SuggestGhostModeTitle(),
-				.strictCancel = true,
-			}));
-			return;
-		}
-	}
 	_openInMediaViewRequests.fire(std::move(request));
 }
 

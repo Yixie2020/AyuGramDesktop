@@ -90,12 +90,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QWindow>
 
-// AyuGram includes
-#include "ayu/ui/settings/settings_main.h"
-#include "ayu/ui/utils/ayu_profile_values.h"
-#include "ayu/utils/telegram_helpers.h"
-
-
 namespace Settings {
 namespace {
 
@@ -118,9 +112,9 @@ public:
 private:
 	void setupChildGeometry();
 	void initViewers();
-	void updateIdText();
+	void updatePhoneText();
 	void refreshNameGeometry(int newWidth);
-	void refreshIdGeometry(int newWidth);
+	void refreshPhoneGeometry(int newWidth);
 	void refreshUsernameGeometry(int newWidth);
 	void refreshQrButtonGeometry(int newWidth);
 
@@ -128,12 +122,11 @@ private:
 	const not_null<UserData*> _user;
 	Info::Profile::EmojiStatusPanel _emojiStatusPanel;
 	Info::Profile::Badge _badge;
-	Info::Profile::Badge _exteraBadge;
 
 	object_ptr<Ui::UserpicButton> _userpic;
 	object_ptr<Ui::FlatLabel> _name = { nullptr };
-	object_ptr<Ui::FlatLabel> _id = { nullptr };
-	QString _idText;
+	object_ptr<Ui::FlatLabel> _phone = { nullptr };
+	QString _phoneText;
 	object_ptr<Ui::FlatLabel> _username = { nullptr };
 	object_ptr<Ui::IconButton> _qrButton = { nullptr };
 
@@ -162,18 +155,6 @@ Cover::Cover(
 	},
 	0, // customStatusLoopsLimit
 	Info::Profile::BadgeType::Premium)
-, _exteraBadge(
-	this,
-	st::infoPeerBadge,
-	&user->session(),
-	ExteraBadgeTypeFromPeer(user),
-	&_emojiStatusPanel,
-	[=] {
-		return controller->isGifPausedAtLeastFor(
-			Window::GifPauseReason::Layer);
-	},
-	0, // customStatusLoopsLimit
-	Info::Profile::BadgeType::Extera | Info::Profile::BadgeType::ExteraSupporter | Info::Profile::BadgeType::ExteraCustom)
 , _userpic(
 	this,
 	controller,
@@ -182,30 +163,31 @@ Cover::Cover(
 	Ui::UserpicButton::Source::PeerPhoto,
 	st::infoProfileCover.photo)
 , _name(this, st::infoProfileCover.name)
-, _id(this, st::defaultFlatLabel, st::popupMenuWithIcons)
+, _phone(this, st::defaultFlatLabel, st::popupMenuWithIcons)
 , _username(this, st::infoProfileMegagroupCover.status) {
 	_user->updateFull();
 
 	_name->setSelectable(true);
 	_name->setContextCopyText(tr::lng_profile_copy_fullname(tr::now));
 
-	_id->setSelectable(true);
-	_id->setContextCopyText(tr::ayu_ContextCopyID(tr::now));
+	_phone->setSelectable(true);
+	_phone->setContextCopyText(tr::lng_profile_copy_phone(tr::now));
 	const auto hook = [=](Ui::FlatLabel::ContextMenuRequest request) {
 		if (request.selection.empty()) {
 			const auto callback = [=] {
-				auto id = IDString(_user);
-				TextUtilities::SetClipboardText({ id });
+				Info::Profile::CopyPhoneToClipboard(
+					Info::Profile::PhoneValue(_user));
 			};
 			request.menu->addAction(
-				tr::ayu_ContextCopyID(tr::now),
+				tr::lng_profile_copy_phone(tr::now),
 				callback,
 				&st::menuIconCopy);
 		} else {
-			_id->fillContextMenu(request);
+			_phone->fillContextMenu(request);
 		}
+		Info::Profile::AddPhoneSpoilerMenu(request.menu, _user);
 	};
-	_id->setContextMenuHook(hook);
+	_phone->setContextMenuHook(hook);
 
 	initViewers();
 	setupChildGeometry();
@@ -235,16 +217,7 @@ Cover::Cover(
 			_badge.widget(),
 			_badge.sizeTag());
 	});
-	const auto isCustomBadge = isCustomBadgePeer(getBareID(_user));
-	const auto isExtera = isExteraPeer(getBareID(_user));
-	const auto isSupporter = isSupporterPeer(getBareID(_user));
-	if (isExtera || isSupporter || isCustomBadge) {
-		_exteraBadge.setPremiumClickCallback(badgeClickHandler(_user));
-	}
-	rpl::merge(
-		_badge.updated(),
-		_exteraBadge.updated()
-	) | rpl::on_next([=] {
+	_badge.updated() | rpl::on_next([=] {
 		refreshNameGeometry(width());
 	}, _name->lifetime());
 
@@ -273,7 +246,7 @@ void Cover::setupChildGeometry() {
 			st::settingsPhotoTop,
 			newWidth);
 		refreshNameGeometry(newWidth);
-		refreshIdGeometry(newWidth);
+		refreshPhoneGeometry(newWidth);
 		refreshUsernameGeometry(newWidth);
 		refreshQrButtonGeometry(newWidth);
 	}, lifetime());
@@ -287,11 +260,16 @@ void Cover::initViewers() {
 		refreshNameGeometry(width());
 	}, lifetime());
 
-	rpl::single(
-		tr::marked(IDString(_user))
+	Info::Profile::PhoneValue(
+		_user
 	) | rpl::on_next([=](const TextWithEntities &value) {
-		_idText = value.text;
-		updateIdText();
+		_phoneText = value.text;
+		updatePhoneText();
+	}, lifetime());
+
+	_user->session().settings().phoneNumberHiddenValue(
+	) | rpl::on_next([=] {
+		updatePhoneText();
 	}, lifetime());
 
 	Info::Profile::UsernameValue(
@@ -335,35 +313,32 @@ void Cover::refreshNameGeometry(int newWidth) {
 	if (const auto width = _badge.widget() ? _badge.widget()->width() : 0) {
 		nameWidth -= st::infoVerifiedCheckPosition.x() + width;
 	}
-	if (const auto width = _exteraBadge.widget() ? _exteraBadge.widget()->width() : 0) {
-		nameWidth -= st::infoVerifiedCheckPosition.x() + width;
-	}
 	_name->resizeToNaturalWidth(nameWidth);
 	_name->moveToLeft(nameLeft, nameTop, newWidth);
 	const auto badgeLeft = nameLeft + _name->width();
 	const auto badgeTop = nameTop;
 	const auto badgeBottom = nameTop + _name->height();
 	_badge.move(badgeLeft, badgeTop, badgeBottom);
-	const auto exteraBadgeLeft = badgeLeft
-		+ (_badge.widget()
-			   ? (_badge.widget()->width() + st::infoVerifiedCheckPosition.x())
-			   : 0);
-	_exteraBadge.move(exteraBadgeLeft, badgeTop, badgeBottom);
 }
 
-void Cover::updateIdText() {
-	_id->setText(_idText);
-	refreshIdGeometry(width());
+void Cover::updatePhoneText() {
+	if (_user->session().settings().phoneNumberHidden()) {
+		_phone->setMarkedText(
+			Ui::Text::Wrapped({ _phoneText }, EntityType::Spoiler));
+	} else {
+		_phone->setText(_phoneText);
+	}
+	refreshPhoneGeometry(width());
 }
 
-void Cover::refreshIdGeometry(int newWidth) {
-	const auto idLeft = st::settingsPhoneLeft;
-	const auto idTop = st::settingsPhoneTop;
-	const auto idWidth = newWidth
-		- idLeft
+void Cover::refreshPhoneGeometry(int newWidth) {
+	const auto phoneLeft = st::settingsPhoneLeft;
+	const auto phoneTop = st::settingsPhoneTop;
+	const auto phoneWidth = newWidth
+		- phoneLeft
 		- st::infoProfileCover.rightSkip;
-	_id->resizeToWidth(idWidth);
-	_id->moveToLeft(idLeft, idTop, newWidth);
+	_phone->resizeToWidth(phoneWidth);
+	_phone->moveToLeft(phoneLeft, phoneTop, newWidth);
 }
 
 void Cover::refreshUsernameGeometry(int newWidth) {
@@ -389,16 +364,6 @@ void BuildSectionButtons(SectionBuilder &builder) {
 	const auto session = builder.session();
 	const auto controller = builder.controller();
 	const auto showOther = builder.showOther();
-
-	builder.addSectionButton({
-		.title = tr::ayu_AyuPreferences(),
-		.targetSection = AyuMain::Id(),
-		.icon = { &st::menuIconPremium },
-		.keywords = { u"ayu"_q },
-	});
-	builder.addSkip();
-	builder.addDivider();
-	builder.addSkip();
 
 	if (!session->supportMode()) {
 		builder.addSectionButton({

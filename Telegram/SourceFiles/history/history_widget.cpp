@@ -216,15 +216,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QWindow>
 #include <QtCore/QMimeData>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/filters/filters_cache_controller.h"
-#include "ayu/utils/telegram_helpers.h"
-#include "ayu/features/message_shot/message_shot.h"
-#include "ayu/features/forward/ayu_forward.h"
-#include "boxes/abstract_box.h"
-
-
 namespace {
 
 constexpr auto kMessagesPerPageFirst = 30;
@@ -265,13 +256,6 @@ const auto kPsaAboutPrefix = "cloud_lng_about_psa_";
 	}
 	return QString();
 }
-
-#define SWITCH_BUTTON(button, show_v) \
-	if (show_v) { \
-		(button)->show(); \
-	} else { \
-		(button)->hide(); \
-	}
 
 } // namespace
 
@@ -330,9 +314,6 @@ HistoryWidget::HistoryWidget(
 , _muteUnmute(
 	this,
 	tr::lng_channel_mute(tr::now).toUpper(),
-	st::historyComposeButton)
-, _discuss(this,
-	tr::ayu_ChannelBottomButtonDiscuss(tr::now).toUpper(),
 	st::historyComposeButton)
 , _reportMessages(this, QString(), st::historyComposeButton)
 , _attachToggle(this, st::historyAttach)
@@ -472,23 +453,9 @@ HistoryWidget::HistoryWidget(
 		}
 	});
 	_unblock->addClickHandler([=] { unblockUser(); });
-	_botStart->setAcceptBoth(true);
-	_botStart->clicks() | rpl::on_next(
-		[=](Qt::MouseButton button)
-		{
-			if (button == Qt::LeftButton) {
-				sendBotStartCommand();
-			} else if (button == Qt::RightButton && isBotStart() && !_peer->asUser()->botInfo->startToken.isEmpty()) {
-				_peer->asUser()->botInfo->startToken = QString();
-				session().changes().peerUpdated(
-					_peer,
-					Data::PeerUpdate::Flag::BotStartToken);
-			}
-		},
-		_botStart->lifetime());
+	_botStart->addClickHandler([=] { sendBotStartCommand(); });
 	_joinChannel->addClickHandler([=] { joinChannel(); });
 	_muteUnmute->addClickHandler([=] { toggleMuteUnmute(); });
-	_discuss->addClickHandler([=] { goToDiscussionGroup(); });
 	setupGiftToChannelButton();
 	setupDirectMessageButton();
 	_reportMessages->addClickHandler([=] { reportSelectedMessages(); });
@@ -607,16 +574,15 @@ HistoryWidget::HistoryWidget(
 
 	_fieldCharsCountManager.limitExceeds(
 	) | rpl::on_next([=] {
-		const auto &settings = AyuSettings::getInstance();
 		const auto hide = _fieldCharsCountManager.isLimitExceeded();
 		if (_silent) {
 			_silent->setVisible(!hide);
 		}
 		if (_ttlInfo) {
-			_ttlInfo->setVisible(!hide && settings.showAutoDeleteButtonInMessageField());
+			_ttlInfo->setVisible(!hide);
 		}
 		if (_giftToUser) {
-			_giftToUser->setVisible(!hide && settings.showGiftButtonInMessageField());
+			_giftToUser->setVisible(!hide);
 		}
 		if (_scheduled) {
 			_scheduled->setVisible(!hide);
@@ -683,7 +649,6 @@ HistoryWidget::HistoryWidget(
 	_botStart->hide();
 	_joinChannel->hide();
 	_muteUnmute->hide();
-	_discuss->hide();
 	_reportMessages->hide();
 
 	initVoiceRecordBar();
@@ -790,44 +755,6 @@ HistoryWidget::HistoryWidget(
 		item->mainView()->itemDataChanged();
 	}, lifetime());
 
-	rpl::merge(
-		session().changes().peerUpdates(
-			Data::PeerUpdate::Flag::IsBlocked
-		) | rpl::to_empty,
-		FiltersCacheController::updates()
-	) | rpl::on_next(
-		[=]
-		{
-			crl::on_main(
-				this,
-				[=]
-				{
-					if (_history) {
-						_history->forceFullResize();
-						if (_migrated) {
-							_migrated->forceFullResize();
-						}
-						updateHistoryGeometry();
-						update();
-
-						for (const auto &item : _history->blocks) {
-							if (!item) {
-								continue;
-							}
-							for (const auto &msg : item->messages) {
-								if (!msg) {
-									continue;
-								}
-
-								_history->owner().requestViewResize(msg.get());
-								_history->owner().requestItemViewRefresh(msg->data());
-							}
-						}
-					}
-				});
-		},
-		lifetime());
-
 	Core::App().settings().largeEmojiChanges(
 	) | rpl::on_next([=] {
 		crl::on_main(this, [=] {
@@ -927,42 +854,6 @@ HistoryWidget::HistoryWidget(
 			updateControlsVisibility();
 			updateControlsGeometry();
 			this->update();
-		}
-	}, lifetime());
-
-	rpl::merge(
-		AyuSettings::getInstance().showAttachButtonInMessageFieldChanges() | rpl::to_empty,
-		AyuSettings::getInstance().showCommandsButtonInMessageFieldChanges() | rpl::to_empty,
-		AyuSettings::getInstance().showEmojiButtonInMessageFieldChanges() | rpl::to_empty,
-		AyuSettings::getInstance().showMicrophoneButtonInMessageFieldChanges() | rpl::to_empty,
-		AyuSettings::getInstance().showAutoDeleteButtonInMessageFieldChanges() | rpl::to_empty,
-		AyuSettings::getInstance().showGiftButtonInMessageFieldChanges() | rpl::to_empty,
-		AyuSettings::getInstance().showAiEditorButtonInMessageFieldChanges() | rpl::to_empty,
-		AyuSettings::getInstance().showAttachPopupChanges() | rpl::to_empty,
-		AyuSettings::getInstance().showEmojiPopupChanges() | rpl::to_empty,
-		AyuSettings::getInstance().channelBottomButtonChanges() | rpl::to_empty,
-		AyuSettings::getInstance().removeMessageTailChanges() | rpl::to_empty
-	) | rpl::on_next([=] {
-		refreshSendGiftToggle();
-		refreshAttachBotsMenu();
-		updateHistoryGeometry();
-		updateControlsVisibility();
-		updateControlsGeometry();
-		this->update();
-	}, lifetime());
-
-	AyuSettings::getInstance().translationProviderChanges(
-	) | rpl::on_next([=](TranslationProvider) {
-		if (_history) {
-			for (const auto &block : _history->blocks) {
-				for (const auto &view : block->messages) {
-					const auto item = view->data();
-					if (item->Has<HistoryMessageTranslation>()) {
-						item->removeTranslationBit();
-						_history->owner().requestItemTextRefresh(item);
-					}
-				}
-			}
 		}
 	}, lifetime());
 
@@ -1211,10 +1102,6 @@ HistoryWidget::HistoryWidget(
 	) | rpl::on_next([=] {
 		confirmDeleteSelected();
 	}, _topBar->lifetime());
-	_topBar->messageShotSelectionRequest(
-	) | rpl::on_next([=] {
-		messageShotSelected();
-	}, _topBar->lifetime());
 	_topBar->clearSelectionRequest(
 	) | rpl::on_next([=] {
 		clearSelected();
@@ -1254,14 +1141,10 @@ HistoryWidget::HistoryWidget(
 		if (action.replaceMediaOf) {
 		} else if (action.options.scheduled) {
 			cancelReplyOrSuggest(lastKeyboardUsed);
-			const auto &ghost = AyuSettings::ghost(&controller->session());
-			if (!ghost.isUseScheduledMessages()) {
-				crl::on_main(this, [=, history = action.history]
-				{
-					controller->showSection(
-						std::make_shared<HistoryView::ScheduledMemento>(history));
-				});
-			}
+			crl::on_main(this, [=, history = action.history] {
+				controller->showSection(
+					std::make_shared<HistoryView::ScheduledMemento>(history));
+			});
 		} else {
 			fastShowAtEnd(action.history);
 			if (!_justMarkingAsRead
@@ -1349,13 +1232,10 @@ void HistoryWidget::refreshGiftToChannelShown() {
 	if (!_giftToChannel || !_peer) {
 		return;
 	}
-	// AyuGram: hide gift button almost everywhere
-	// still accessible via the menu in peer window
 	const auto channel = _peer->asChannel();
 	_giftToChannel->setVisible(channel
 		&& channel->isBroadcast()
-		&& channel->stargiftsAvailable()
-		&& isExteraPeer(getBareID(channel)));
+		&& channel->stargiftsAvailable());
 }
 
 void HistoryWidget::refreshDirectMessageShown() {
@@ -2586,18 +2466,14 @@ void HistoryWidget::fileChosen(ChatHelpers::FileChosen &&data) {
 				crl::guard(this, [=](
 						Api::SendOptions options,
 						TextWithTags caption) {
-					const auto effectiveFrom = options.scheduled
-						? Ui::MessageSendingAnimationFrom()
-						: from;
-					controller()->sendingAnimation().appendSending(
-						effectiveFrom);
+					controller()->sendingAnimation().appendSending(from);
 					auto messageToSend = Api::MessageToSend(
 						prepareSendAction(options));
 					messageToSend.textWithTags = std::move(caption);
 					sendExistingDocument(
 						document,
 						std::move(messageToSend),
-						effectiveFrom.localId);
+						from.localId);
 				}));
 			return;
 		}
@@ -3605,14 +3481,12 @@ void HistoryWidget::setHistory(History *history) {
 	}
 	_pullToNext->setHistory(history);
 
-	const auto &settings = AyuSettings::getInstance();
-
 	const auto was = _attachBotsMenu && _history && _history->peer->isUser();
-	const auto now = _attachBotsMenu && history && history->peer->isUser() && settings.showAttachPopup();
+	const auto now = _attachBotsMenu && history && history->peer->isUser();
 	if (was && !now) {
 		_attachToggle->removeEventFilter(_attachBotsMenu.get());
 		_attachBotsMenu->hideFast();
-	} else if (now && !was) {
+	} else if (now && !was && !ChatHelpers::ShowPanelOnClick()) {
 		_attachToggle->installEventFilter(_attachBotsMenu.get());
 	}
 
@@ -3696,9 +3570,6 @@ void HistoryWidget::refreshAttachBotsMenu() {
 	if (!_history) {
 		return;
 	}
-
-	const auto &settings = AyuSettings::getInstance();
-
 	_attachBotsMenu = InlineBots::MakeAttachBotsMenu(
 		this,
 		controller(),
@@ -3717,7 +3588,7 @@ void HistoryWidget::refreshAttachBotsMenu() {
 	}
 	_attachBotsMenu->setOrigin(
 		Ui::PanelAnimation::Origin::BottomLeft);
-	if (settings.showAttachPopup()) {
+	if (!ChatHelpers::ShowPanelOnClick()) {
 		_attachToggle->installEventFilter(_attachBotsMenu.get());
 	}
 	_attachBotsMenu->heightValue(
@@ -3999,8 +3870,6 @@ void HistoryWidget::refreshScheduledToggle() {
 
 void HistoryWidget::refreshSendGiftToggle() {
 	using Type = Api::DisallowedGiftType;
-
-	const auto &settings = AyuSettings::getInstance();
 	const auto user = _peer ? _peer->asUser() : nullptr;
 	const auto disallowed = user ? user->disallowedGiftTypes() : Type();
 	const auto all = Type::Premium
@@ -4012,7 +3881,6 @@ void HistoryWidget::refreshSendGiftToggle() {
 		&& !user->isServiceUser()
 		&& !user->isSelf()
 		&& !user->isBot()
-		&& settings.showGiftButtonInMessageField()
 		&& ((disallowed & Type::SendHide)
 			|| (session().user()->disallowedGiftTypes() & Type::SendHide)
 			|| Data::IsBirthdayToday(user->birthday()))
@@ -4129,8 +3997,6 @@ bool HistoryWidget::canWriteMessage() const {
 }
 
 void HistoryWidget::updateControlsVisibility() {
-	const auto &settings = AyuSettings::getInstance();
-
 	auto fieldDisabledRemoved = (_fieldDisabled != nullptr);
 	auto fieldVisibilityChanged = false;
 	const auto hideExtra = hideExtraButtons();
@@ -4233,32 +4099,12 @@ void HistoryWidget::updateControlsVisibility() {
 			toggle(_reportMessages);
 		} else if (isBlocked()) {
 			toggle(_unblock);
-			_discuss->hide();
 		} else if (isJoinChannel()) {
 			toggle(_joinChannel);
-			_discuss->hide();
 		} else if (isMuteUnmute()) {
 			toggle(_muteUnmute);
-			if (hasDiscussionGroup()) {
-				if (_discuss->isHidden()) {
-					_discuss->clearState();
-					_discuss->show();
-				}
-			} else {
-				_discuss->hide();
-			}
 		} else if (isBotStart()) {
 			toggle(_botStart);
-			_discuss->hide();
-
-			const auto startToken = _peer->asUser()->botInfo->startToken;
-			if (!startToken.isEmpty()) {
-				const auto shortened = startToken.left(20);
-				const auto s = QString("%1 (%2)").arg(tr::lng_bot_start(tr::now).toUpper()).arg(shortened);
-				_botStart->setText(s);
-			} else {
-				_botStart->setText(tr::lng_bot_start(tr::now).toUpper());
-			}
 		}
 		_kbShown = false;
 		if (_autocomplete) {
@@ -4321,7 +4167,6 @@ void HistoryWidget::updateControlsVisibility() {
 		_botStart->hide();
 		_joinChannel->hide();
 		_muteUnmute->hide();
-		_discuss->hide();
 		_reportMessages->hide();
 		_send->show();
 		updateSendButtonType();
@@ -4357,27 +4202,27 @@ void HistoryWidget::updateControlsVisibility() {
 			_botCommandStart->hide();
 		} else if (_kbReplyTo) {
 			_kbScroll->hide();
-			SWITCH_BUTTON(_tabbedSelectorToggle, settings.showEmojiButtonInMessageField());
+			_tabbedSelectorToggle->show();
 			_botKeyboardHide->hide();
 			_botKeyboardShow->hide();
 			_botCommandStart->hide();
 		} else {
 			_kbScroll->hide();
-			SWITCH_BUTTON(_tabbedSelectorToggle, settings.showEmojiButtonInMessageField());
+			_tabbedSelectorToggle->show();
 			_botKeyboardHide->hide();
 			if (_keyboard->hasMarkup()) {
 				_botKeyboardShow->show();
 				_botCommandStart->hide();
 			} else {
 				_botKeyboardShow->hide();
-				_botCommandStart->setVisible(_cmdStartShown && settings.showCommandsButtonInMessageField());
+				_botCommandStart->setVisible(_cmdStartShown);
 			}
 		}
 		if (_replaceMedia) {
 			_replaceMedia->show();
 			_attachToggle->hide();
 		} else {
-			SWITCH_BUTTON(_attachToggle, settings.showAttachButtonInMessageField());
+			_attachToggle->show();
 		}
 		if (_botMenu.button) {
 			_botMenu.button->show();
@@ -4413,9 +4258,7 @@ void HistoryWidget::updateControlsVisibility() {
 			}
 			if (_giftToUser) {
 				const auto was = _giftToUser->isVisible();
-				const auto now = (!_editMsgId)
-					&& (!hideExtra)
-					&& settings.showGiftButtonInMessageField();
+				const auto now = (!_editMsgId) && (!hideExtra);
 				if (was != now) {
 					_giftToUser->setVisible(now);
 					rightButtonsChanged = true;
@@ -4423,9 +4266,7 @@ void HistoryWidget::updateControlsVisibility() {
 			}
 			if (_ttlInfo) {
 				const auto was = _ttlInfo->isVisible();
-				const auto now = (!_editMsgId)
-					&& (!hideExtra)
-					&& settings.showAutoDeleteButtonInMessageField();
+				const auto now = (!_editMsgId) && (!hideExtra);
 				if (was != now) {
 					_ttlInfo->setVisible(now);
 					rightButtonsChanged = true;
@@ -4466,7 +4307,6 @@ void HistoryWidget::updateControlsVisibility() {
 		_botStart->hide();
 		_joinChannel->hide();
 		_muteUnmute->hide();
-		_discuss->hide();
 		_reportMessages->hide();
 		_attachToggle->hide();
 		if (_silent) {
@@ -4771,10 +4611,7 @@ void HistoryWidget::messagesReceived(
 		not_null<PeerData*> peer,
 		const MTPmessages_Messages &messages,
 		int requestId) {
-	// Expects(_history != nullptr);
-	if (!_history || !_peer) {
-		return; // AyuGram: fix crash when using `saveDeletedMessages`
-	}
+	Expects(_history != nullptr);
 
 	const auto toMigrated = (peer == _peer->migrateFrom());
 	if (peer != _peer && !toMigrated) {
@@ -6161,27 +5998,6 @@ void HistoryWidget::toggleMuteUnmute() {
 	session().data().notifySettings().update(_peer, muteForSeconds);
 }
 
-void HistoryWidget::goToDiscussionGroup() {
-	const auto channel = _peer ? _peer->asChannel() : nullptr;
-	const auto chat = channel ? channel->discussionLink() : nullptr;
-	if (!chat) {
-		return;
-	}
-	controller()->showPeerHistory(chat, Window::SectionShow::Way::Forward);
-}
-
-bool HistoryWidget::hasDiscussionGroup() const {
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.channelBottomButton() != ChannelBottomButton::DiscussWithFallback) {
-		return false;
-	}
-
-	const auto channel = _peer ? _peer->asChannel() : nullptr;
-	return channel
-		&& channel->isBroadcast()
-		&& (channel->flags() & ChannelDataFlag::HasLink);
-}
-
 void HistoryWidget::reportSelectedMessages() {
 	if (!_list || !_chooseForReport || !_list->getSelectionState().count) {
 		return;
@@ -6842,11 +6658,6 @@ bool HistoryWidget::isChoosingTheme() const {
 }
 
 bool HistoryWidget::isMuteUnmute() const {
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.channelBottomButton() == ChannelBottomButton::Hidden) {
-		return false;
-	}
-
 	return _peer
 		&& ((_peer->isBroadcast() && !_peer->asChannel()->canPostMessages())
 			|| (_peer->isGigagroup() && !Data::CanSendAnything(_peer))
@@ -6859,11 +6670,6 @@ bool HistoryWidget::isSearching() const {
 }
 
 bool HistoryWidget::showRecordButton() const {
-	const auto &settings = AyuSettings::getInstance();
-	if (!settings.showMicrophoneButtonInMessageField()) {
-		return false;
-	}
-
 	return (_recordAvailability != Webrtc::RecordAvailability::None)
 		&& !_voiceRecordBar->isListenState()
 		&& !_voiceRecordBar->isRecordingByAnotherBar()
@@ -7156,8 +6962,6 @@ void HistoryWidget::showKeyboardHideButton() {
 }
 
 void HistoryWidget::toggleKeyboard(bool manual) {
-	const auto &settings = AyuSettings::getInstance();
-
 	const auto fieldEnabled = canWriteMessage() && !_showAnimation;
 	if (_kbShown || _kbReplyTo) {
 		_botKeyboardHide->hide();
@@ -7194,7 +6998,7 @@ void HistoryWidget::toggleKeyboard(bool manual) {
 		_botKeyboardHide->hide();
 		_botKeyboardShow->hide();
 		if (fieldEnabled) {
-			SWITCH_BUTTON(_botCommandStart, settings.showCommandsButtonInMessageField());
+			_botCommandStart->show();
 		}
 		_kbScroll->hide();
 		_kbShown = false;
@@ -7245,9 +7049,13 @@ void HistoryWidget::toggleKeyboard(bool manual) {
 	updateSendAsFileVisibility();
 	updateExpandButtonVisibility();
 	updateFieldPlaceholder();
-	SWITCH_BUTTON(_tabbedSelectorToggle, _botKeyboardHide->isHidden()
+	if (_botKeyboardHide->isHidden()
 		&& canWriteMessage()
-		&& !_showAnimation && settings.showEmojiButtonInMessageField());
+		&& !_showAnimation) {
+		_tabbedSelectorToggle->show();
+	} else {
+		_tabbedSelectorToggle->hide();
+	}
 	updateField();
 }
 
@@ -7559,8 +7367,6 @@ void HistoryWidget::updateSendAsFileGeometry() {
 }
 
 void HistoryWidget::moveFieldControls() {
-	const auto &settings = AyuSettings::getInstance();
-
 	auto keyboardHeight = 0;
 	auto bottom = height();
 	auto maxKeyboardHeight = computeMaxFieldHeight() - fieldHeight();
@@ -7585,10 +7391,8 @@ void HistoryWidget::moveFieldControls() {
 	if (_replaceMedia) {
 		_replaceMedia->moveToLeft(left, buttonsBottom);
 	}
-	if (settings.showAttachButtonInMessageField()) {
-		_attachToggle->moveToLeft(left, buttonsBottom);
+	_attachToggle->moveToLeft(left, buttonsBottom);
 	left += _attachToggle->width();
-	}
 	if (_sendAs) {
 		_sendAs->moveToLeft(left, buttonsBottom);
 		left += _sendAs->width();
@@ -7606,14 +7410,14 @@ void HistoryWidget::moveFieldControls() {
 	_voiceRecordBar->moveToLeft(0, bottom - _voiceRecordBar->height());
 	_tabbedSelectorToggle->moveToRight(right, buttonsBottom);
 	_botKeyboardHide->moveToRight(right, buttonsBottom);
-	right += settings.showEmojiButtonInMessageField() || !_botKeyboardHide->isHidden() ? _botKeyboardHide->width() : 0;
+	right += _botKeyboardHide->width();
 	_botKeyboardShow->moveToRight(right, buttonsBottom);
 	_botCommandStart->moveToRight(right, buttonsBottom);
 	if (_silent) {
 		_silent->moveToRight(right, buttonsBottom);
 	}
 	const auto kbShowShown = _history && !_kbShown && _keyboard->hasMarkup();
-	if (kbShowShown || (_cmdStartShown && settings.showCommandsButtonInMessageField()) || _silent) {
+	if (kbShowShown || _cmdStartShown || _silent) {
 		right += _botCommandStart->width();
 	}
 	if (_toggleSuggestPost) {
@@ -7660,7 +7464,6 @@ void HistoryWidget::moveFieldControls() {
 	_unblock->setGeometry(fullWidthButtonRect);
 	_joinChannel->setGeometry(fullWidthButtonRect);
 	_muteUnmute->setGeometry(fullWidthButtonRect);
-	_discuss->setGeometry(fullWidthButtonRect);
 	_reportMessages->setGeometry(fullWidthButtonRect);
 	if (_sendRestriction) {
 		_sendRestriction->setGeometry(fullWidthButtonRect);
@@ -7668,14 +7471,12 @@ void HistoryWidget::moveFieldControls() {
 }
 
 void HistoryWidget::updateFieldSize() {
-	const auto &settings = AyuSettings::getInstance();
-
 	const auto kbShowShown = _history && !_kbShown && _keyboard->hasMarkup();
 	auto fieldWidth = width()
-		- (settings.showAttachButtonInMessageField() ? _attachToggle->width() : 0)
+		- _attachToggle->width()
 		- st::historySendRight
 		- _send->width()
-		- (settings.showEmojiButtonInMessageField() ? _tabbedSelectorToggle->width() : 0);
+		- _tabbedSelectorToggle->width();
 	if (_botMenu.button) {
 		fieldWidth -= st::historyBotMenuSkip + _botMenu.button->width();
 	}
@@ -7685,7 +7486,7 @@ void HistoryWidget::updateFieldSize() {
 	if (kbShowShown) {
 		fieldWidth -= _botKeyboardShow->width();
 	}
-	if (_cmdStartShown && settings.showCommandsButtonInMessageField()) {
+	if (_cmdStartShown) {
 		fieldWidth -= _botCommandStart->width();
 	}
 	if (_silent && !_silent->isHidden()) {
@@ -7700,7 +7501,7 @@ void HistoryWidget::updateFieldSize() {
 	if (_scheduled && !_scheduled->isHidden()) {
 		fieldWidth -= _scheduled->width();
 	}
-	if (_ttlInfo && _ttlInfo->isVisible() && settings.showAutoDeleteButtonInMessageField()) {
+	if (_ttlInfo && _ttlInfo->isVisible()) {
 		fieldWidth -= _ttlInfo->width();
 	}
 
@@ -8002,8 +7803,7 @@ bool HistoryWidget::confirmSendingFiles(
 		text,
 		_peer,
 		Api::SendType::Normal,
-		sendMenuDetails(),
-		[=](const TextWithTags &text) { _field->setTextWithTags(text); });
+		sendMenuDetails());
 	box->setReplyTo(replyTo());
 	_field->setTextWithTags({});
 	box->setConfirmedCallback(crl::guard(this, [=](
@@ -8169,7 +7969,6 @@ void HistoryWidget::handleHistoryChange(not_null<const History*> history) {
 			const auto botStart = isBotStart();
 			const auto joinChannel = isJoinChannel();
 			const auto muteUnmute = isMuteUnmute();
-			const auto discuss = muteUnmute && hasDiscussionGroup();
 			const auto reportMessages = isReportMessages();
 			const auto update = false
 				|| (_reportMessages->isHidden() == reportMessages)
@@ -8185,7 +7984,7 @@ void HistoryWidget::handleHistoryChange(not_null<const History*> history) {
 					&& !unblock
 					&& !botStart
 					&& !joinChannel
-					&& (_muteUnmute->isHidden() == muteUnmute || _discuss->isHidden() == discuss));
+					&& _muteUnmute->isHidden() == muteUnmute);
 			if (update) {
 				updateControlsVisibility();
 				updateControlsGeometry();
@@ -8520,9 +8319,7 @@ void HistoryWidget::updateSendRestriction() {
 		return;
 	}
 	_sendRestrictionKey = restriction.text;
-	if (AyuForward::isForwarding(_peer->id)) {
-		_sendRestriction = AyuForwardWriteRestriction(this, _peer->id, session());
-	} else if (!restriction) {
+	if (!restriction) {
 		_sendRestriction = nullptr;
 	} else if (restriction.frozen) {
 		const auto show = controller()->uiShow();
@@ -8899,8 +8696,6 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 		return;
 	}
 
-	const auto &settings = AyuSettings::getInstance();
-
 	const auto wasVisible = _kbShown || _kbReplyTo;
 	const auto wasMsgId = _keyboard->forMsgId();
 	auto changed = false;
@@ -8951,7 +8746,7 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 					showKeyboardHideButton();
 				} else {
 					_kbScroll->hide();
-					SWITCH_BUTTON(_tabbedSelectorToggle, settings.showEmojiButtonInMessageField());
+					_tabbedSelectorToggle->show();
 					_botKeyboardHide->hide();
 				}
 				_botKeyboardShow->hide();
@@ -8975,7 +8770,7 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 		} else {
 			if (!_showAnimation) {
 				_kbScroll->hide();
-				SWITCH_BUTTON(_tabbedSelectorToggle, settings.showEmojiButtonInMessageField());
+				_tabbedSelectorToggle->show();
 				_botKeyboardHide->hide();
 				_botKeyboardShow->show();
 				_botCommandStart->hide();
@@ -8994,11 +8789,10 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 	} else {
 		if (!_scroll->isHidden()) {
 			_kbScroll->hide();
-			//SWITCH_BUTTON(_tabbedSelectorToggle, settings.showEmojiButtonInMessageField);
 			_tabbedSelectorToggle->show();
 			_botKeyboardHide->hide();
 			_botKeyboardShow->hide();
-			_botCommandStart->setVisible(!_editMsgId && settings.showCommandsButtonInMessageField());
+			_botCommandStart->setVisible(!_editMsgId);
 		}
 		_field->setMaxHeight(computeMaxFieldHeight());
 		_kbShown = false;
@@ -10878,8 +10672,8 @@ void HistoryWidget::handlePeerUpdate() {
 	if (!_showAnimation) {
 		const auto blockChanged = (_unblock->isHidden() == isBlocked());
 		if (blockChanged
-			|| ((!isBlocked() && _joinChannel->isHidden() == isJoinChannel())
-				|| (isMuteUnmute() && _discuss->isHidden() == hasDiscussionGroup()))) {
+			|| (!isBlocked()
+				&& (_joinChannel->isHidden() == isJoinChannel()))) {
 			resize = true;
 		}
 		if (updateCanSendMessage()) {
@@ -10979,16 +10773,6 @@ void HistoryWidget::confirmDeleteSelected() {
 		}));
 		controller()->show(std::move(box));
 	}
-}
-
-void HistoryWidget::messageShotSelected() {
-	if (!_list) {
-		return;
-	}
-
-	AyuFeatures::MessageShot::Wrapper(
-		_list.data(),
-		[=] { clearSelected(); });
 }
 
 void HistoryWidget::escape() {

@@ -59,10 +59,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_history_view_about_view.h"
 #include "styles/style_menu_icons.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-
-
 namespace HistoryView {
 namespace {
 
@@ -273,7 +269,6 @@ auto GenerateChatIntro(
 				st::defaultTextStyle,
 				links));
 		};
-		const auto disableGreeting = AyuSettings::getInstance().disableGreetingSticker();
 		const auto title = data.customPhrases()
 			? data.title
 			: tr::lng_chat_intro_default_title(tr::now);
@@ -281,41 +276,37 @@ auto GenerateChatIntro(
 			? data.description
 			: tr::lng_chat_intro_default_message(tr::now);
 		pushText(tr::bold(title), st::chatIntroTitleMargin);
-		if (!disableGreeting || data.customPhrases()) {
-			pushText({ description }, title.isEmpty()
-				? st::chatIntroTitleMargin
-				: st::chatIntroMargin);
-		}
-		if (!disableGreeting || data.sticker) {
-			const auto sticker = [=] {
-				using Tag = ChatHelpers::StickerLottieSize;
-				auto sticker = data.sticker;
-				if (!sticker && !disableGreeting) {
-					const auto api = &parent->history()->session().api();
-					const auto &list = api->premium().helloStickers();
-					if (!list.empty()) {
-						sticker = list[base::RandomIndex(list.size())];
-						if (helloChosen) {
-							helloChosen(sticker);
-						}
+		pushText({ description }, title.isEmpty()
+			? st::chatIntroTitleMargin
+			: st::chatIntroMargin);
+		const auto sticker = [=] {
+			using Tag = ChatHelpers::StickerLottieSize;
+			auto sticker = data.sticker;
+			if (!sticker) {
+				const auto api = &parent->history()->session().api();
+				const auto &list = api->premium().helloStickers();
+				if (!list.empty()) {
+					sticker = list[base::RandomIndex(list.size())];
+					if (helloChosen) {
+						helloChosen(sticker);
 					}
 				}
-				const auto send = [=] {
-					sendIntroSticker(sticker);
-				};
-				return StickerInBubblePart::Data{
-					.sticker = sticker,
-					.size = st::chatIntroStickerSize,
-					.cacheTag = Tag::ChatIntroHelloSticker,
-					.link = std::make_shared<LambdaClickHandler>(send),
-				};
+			}
+			const auto send = [=] {
+				sendIntroSticker(sticker);
 			};
-			push(std::make_unique<StickerInBubblePart>(
-				parent,
-				replacing,
-				sticker,
-				st::chatIntroStickerPadding));
-		}
+			return StickerInBubblePart::Data{
+				.sticker = sticker,
+				.size = st::chatIntroStickerSize,
+				.cacheTag = Tag::ChatIntroHelloSticker,
+				.link = std::make_shared<LambdaClickHandler>(send),
+			};
+		};
+		push(std::make_unique<StickerInBubblePart>(
+			parent,
+			replacing,
+			sticker,
+			st::chatIntroStickerPadding));
 	};
 }
 
@@ -773,7 +764,7 @@ bool AboutView::refresh() {
 				makeIntro(user);
 			} else if (const auto stars = user->starsPerMessageChecked()) {
 				setItem(makeStarsPerMessage(stars), nullptr);
-			} else if (!AyuSettings::getInstance().disableGreetingSticker()) {
+			} else {
 				makeIntro(user);
 			}
 			return true;

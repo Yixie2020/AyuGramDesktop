@@ -51,12 +51,6 @@ enum class SendWithoutSoundOption {
 	Always = 2,
 };
 
-enum class DownloadSpeedBoost {
-	Off = 0,
-	Average = 1,
-	Extreme = 2,
-};
-
 NLOHMANN_JSON_SERIALIZE_ENUM(PeerIdDisplay, {
 	{PeerIdDisplay::Hidden, 0},
 	{PeerIdDisplay::TelegramApi, 1},
@@ -86,12 +80,6 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SendWithoutSoundOption, {
 	{SendWithoutSoundOption::Never, 0},
 	{SendWithoutSoundOption::InGhostMode, 1},
 	{SendWithoutSoundOption::Always, 2},
-})
-
-NLOHMANN_JSON_SERIALIZE_ENUM(DownloadSpeedBoost, {
-	{DownloadSpeedBoost::Off, 0},
-	{DownloadSpeedBoost::Average, 1},
-	{DownloadSpeedBoost::Extreme, 2},
 })
 
 class GhostModeAccountSettings {
@@ -281,8 +269,6 @@ public:
 
 	[[nodiscard]] bool saveDeletedMessages() const { return _saveDeletedMessages.current(); }
 	[[nodiscard]] bool saveMessagesHistory() const { return _saveMessagesHistory.current(); }
-	[[nodiscard]] bool keepForbiddenChats() const { return _keepForbiddenChats.current(); }
-	void setKeepForbiddenChats(bool val);
 	[[nodiscard]] bool saveForBots() const { return _saveForBots.current(); }
 	[[nodiscard]] bool filtersEnabled() const { return _filtersEnabled.current(); }
 	[[nodiscard]] bool filtersEnabledInChats() const { return _filtersEnabledInChats.current(); }
@@ -353,7 +339,6 @@ public:
 	[[nodiscard]] bool quickAdminShortcuts() const { return _quickAdminShortcuts.current(); }
 	[[nodiscard]] bool disableGreetingSticker() const { return _disableGreetingSticker.current(); }
 	[[nodiscard]] PeerIdDisplay showPeerId() const { return _showPeerId.current(); }
-	[[nodiscard]] DownloadSpeedBoost downloadSpeedBoost() const { return _downloadSpeedBoost.current(); }
 	[[nodiscard]] bool showMessageSeconds() const { return _showMessageSeconds.current(); }
 	[[nodiscard]] bool showMessageShot() const { return _showMessageShot.current(); }
 	[[nodiscard]] bool filterZalgo() const { return _filterZalgo.current(); }
@@ -441,7 +426,6 @@ public:
 	void setQuickAdminShortcuts(bool val);
 	void setDisableGreetingSticker(bool val);
 	void setShowPeerId(PeerIdDisplay val);
-	void setDownloadSpeedBoost(DownloadSpeedBoost val);
 	void setShowMessageSeconds(bool val);
 	void setShowMessageShot(bool val);
 	void setFilterZalgo(bool val);
@@ -463,8 +447,6 @@ public:
 	[[nodiscard]] rpl::producer<bool> saveDeletedMessagesChanges() const { return _saveDeletedMessages.changes(); }
 	[[nodiscard]] rpl::producer<bool> saveMessagesHistoryValue() const { return _saveMessagesHistory.value(); }
 	[[nodiscard]] rpl::producer<bool> saveMessagesHistoryChanges() const { return _saveMessagesHistory.changes(); }
-	[[nodiscard]] rpl::producer<bool> keepForbiddenChatsValue() const { return _keepForbiddenChats.value(); }
-	[[nodiscard]] rpl::producer<bool> keepForbiddenChatsChanges() const { return _keepForbiddenChats.changes(); }
 	[[nodiscard]] rpl::producer<bool> saveForBotsValue() const { return _saveForBots.value(); }
 	[[nodiscard]] rpl::producer<bool> saveForBotsChanges() const { return _saveForBots.changes(); }
 	[[nodiscard]] rpl::producer<bool> filtersEnabledValue() const { return _filtersEnabled.value(); }
@@ -605,8 +587,6 @@ public:
 	[[nodiscard]] rpl::producer<bool> disableGreetingStickerChanges() const { return _disableGreetingSticker.changes(); }
 	[[nodiscard]] rpl::producer<PeerIdDisplay> showPeerIdValue() const { return _showPeerId.value(); }
 	[[nodiscard]] rpl::producer<PeerIdDisplay> showPeerIdChanges() const { return _showPeerId.changes(); }
-	[[nodiscard]] rpl::producer<DownloadSpeedBoost> downloadSpeedBoostValue() const { return _downloadSpeedBoost.value(); }
-	[[nodiscard]] rpl::producer<DownloadSpeedBoost> downloadSpeedBoostChanges() const { return _downloadSpeedBoost.changes(); }
 	[[nodiscard]] rpl::producer<bool> showMessageSecondsValue() const { return _showMessageSeconds.value(); }
 	[[nodiscard]] rpl::producer<bool> showMessageSecondsChanges() const { return _showMessageSeconds.changes(); }
 	[[nodiscard]] rpl::producer<bool> showMessageShotValue() const { return _showMessageShot.value(); }
@@ -646,7 +626,6 @@ private:
 
 	rpl::variable<bool> _saveDeletedMessages = true;
 	rpl::variable<bool> _saveMessagesHistory = true;
-	rpl::variable<bool> _keepForbiddenChats = true;
 	rpl::variable<bool> _saveForBots = false;
 	std::unordered_set<int64> _shadowBanIds;
 	rpl::variable<bool> _filtersEnabled = false;
@@ -718,7 +697,6 @@ private:
 	rpl::variable<bool> _quickAdminShortcuts = true;
 	rpl::variable<bool> _disableGreetingSticker = false;
 	rpl::variable<PeerIdDisplay> _showPeerId = PeerIdDisplay::BotApi;
-	rpl::variable<DownloadSpeedBoost> _downloadSpeedBoost = DownloadSpeedBoost::Off;
 	rpl::variable<bool> _showMessageSeconds = false;
 	rpl::variable<bool> _showMessageShot = true;
 	rpl::variable<bool> _filterZalgo = false;

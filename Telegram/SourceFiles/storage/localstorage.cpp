@@ -32,14 +32,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_instance.h"
 
 #include <QtCore/QDirIterator>
+#include <QtCore/QSaveFile>
 
 #ifndef Q_OS_WIN
 #include <unistd.h>
 #endif // Q_OS_WIN
-
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-
 
 //extern "C" {
 //#include <openssl/evp.h>
@@ -446,8 +443,6 @@ void writeSettings() {
 
 	if (!QDir().exists(_basePath)) QDir().mkpath(_basePath);
 
-    AyuSettings::save();
-
 	// We dropped old test authorizations when migrated to multi auth.
 	//const auto name = cTestMode() ? u"settings_test"_q : u"settings"_q;
 	const auto name = u"settings"_q;
@@ -560,7 +555,7 @@ const QString &readAutoupdatePrefixRaw() {
 			return AutoupdatePrefix(value);
 		}
 	}
-	return AutoupdatePrefix("https://update.ayugram.one/");
+	return AutoupdatePrefix("https://td.telegram.org");
 }
 
 void writeAutoupdatePrefix(const QString &prefix) {
@@ -569,12 +564,11 @@ void writeAutoupdatePrefix(const QString &prefix) {
 	}
 
 	const auto current = readAutoupdatePrefixRaw();
-    const auto fixedPrefix = QString::fromStdString("https://update.ayugram.one/");
-	if (current != fixedPrefix) {
-		AutoupdatePrefix(fixedPrefix);
+	if (current != prefix) {
+		AutoupdatePrefix(prefix);
 		QFile f(autoupdatePrefixFile());
 		if (f.open(QIODevice::WriteOnly)) {
-			f.write(fixedPrefix.toUtf8());
+			f.write(prefix.toUtf8());
 			f.close();
 		}
 		if (cAutoUpdate()) {
@@ -590,6 +584,55 @@ QString readAutoupdatePrefix() {
 	static const auto RegExp = QRegularExpression("/+$");
 	auto result = readAutoupdatePrefixRaw();
 	return result.replace(RegExp, QString());
+}
+
+QString updateManifestFile() {
+	Expects(!Core::UpdaterDisabled());
+
+	return cWorkingDir() + "tdata/update-manifest";
+}
+
+// The file holds the detached 64-byte root Ed25519 signature followed by
+// the manifest JSON verbatim. The content is attacker-reachable bytes as
+// far as readers are concerned: the caller verifies it against the pinned
+// root key after reading.
+void writeUpdateManifest(
+		const QByteArray &manifest,
+		const QByteArray &signature) {
+	if (Core::UpdaterDisabled()
+		|| signature.size() != 64
+		|| manifest.isEmpty()) {
+		return;
+	}
+	QSaveFile f(updateManifestFile());
+	if (!f.open(QIODevice::WriteOnly)
+		|| f.write(signature) != signature.size()
+		|| f.write(manifest) != manifest.size()
+		|| !f.commit()) {
+		LOG(("Storage Error: Could not write the update manifest."));
+	}
+}
+
+bool readUpdateManifest(QByteArray *manifest, QByteArray *signature) {
+	Expects(manifest != nullptr && signature != nullptr);
+
+	if (Core::UpdaterDisabled()) {
+		return false;
+	}
+	QFile f(updateManifestFile());
+	if (!f.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	constexpr auto kSignatureSize = 64;
+	constexpr auto kMaxManifestSize = 256 * 1024;
+	const auto content = f.readAll();
+	if (content.size() <= kSignatureSize
+		|| content.size() > kSignatureSize + kMaxManifestSize) {
+		return false;
+	}
+	*signature = content.left(kSignatureSize);
+	*manifest = content.mid(kSignatureSize);
+	return true;
 }
 
 void writeBackground(const Data::WallPaper &paper, const QImage &image) {

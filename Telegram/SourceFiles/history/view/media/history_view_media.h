@@ -274,8 +274,6 @@ public:
 
 	virtual void hideSpoilers() {
 	}
-	virtual void revealSpoilers() {
-	}
 	[[nodiscard]] virtual bool needsBubble() const = 0;
 	[[nodiscard]] virtual bool unwrapped() const {
 		return false;

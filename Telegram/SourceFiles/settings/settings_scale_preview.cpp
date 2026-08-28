@@ -32,12 +32,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QScreen>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/ui/ayu_userpic.h"
-#include "ui/chat/chat_style_radius.h"
-
-
 namespace Settings {
 namespace {
 
@@ -707,15 +701,13 @@ void Preview::paintReply(Painter &p, QRect clip) {
 			outline,
 			_replyRect.height());
 		p.drawRoundedRect(_replyRect, radius, radius);
-		if (!AyuSettings::getInstance().simpleQuotesAndReplies()) {
-			p.setOpacity(Ui::kDefaultBgOpacity);
-			p.setClipRect(
-				_replyRect.x() + outline,
-				_replyRect.y(),
-				_replyRect.width() - outline,
-				_replyRect.height());
-			p.drawRoundedRect(_replyRect, radius, radius);
-		}
+		p.setOpacity(Ui::kDefaultBgOpacity);
+		p.setClipRect(
+			_replyRect.x() + outline,
+			_replyRect.y(),
+			_replyRect.width() - outline,
+			_replyRect.height());
+		p.drawRoundedRect(_replyRect, radius, radius);
 	}
 	p.setOpacity(1.);
 	p.setClipping(false);
@@ -754,19 +746,10 @@ void Preview::validateUserpicCache() {
 		|| _userpic.isEmpty()) {
 		return;
 	}
-	auto scaled = _userpicOriginal.scaled(
+	_userpicImage = Images::Circle(_userpicOriginal.scaled(
 		_userpic.size() * _ratio,
 		Qt::IgnoreAspectRatio,
-		Qt::SmoothTransformation);
-	if (AyuUserpic::IsCircle()) {
-		_userpicImage = Images::Circle(std::move(scaled));
-	} else {
-		const auto r = AyuUserpic::ComputeRadius(
-			std::min(scaled.width(), scaled.height()));
-		_userpicImage = Images::Round(
-			std::move(scaled),
-			Images::CornersMask(r));
-	}
+		Qt::SmoothTransformation));
 	_userpicImage.setDevicePixelRatio(_ratio);
 }
 
@@ -774,7 +757,7 @@ void Preview::validateBubbleCache() {
 	if (!_bubbleCorners.p[0].isNull()) {
 		return;
 	}
-	const auto radius = scaled(Ui::BubbleRadiusLarge());
+	const auto radius = scaled(16); // st::bubbleRadiusLarge
 	_bubbleCorners = Ui::PrepareCornerPixmaps(radius, st::msgInBg);
 	_bubbleCorners.p[2] = {};
 	_bubbleTail = scaled(st::historyBubbleTailInLeft, st::msgInBg->c);

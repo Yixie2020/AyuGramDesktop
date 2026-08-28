@@ -45,10 +45,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDateTime>
 #include <QtCore/QLocale>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-
-
 namespace {
 
 constexpr auto kReminderSetToastDuration = 4 * crl::time(1000);
@@ -311,12 +307,10 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 		const auto open = [=] {
 			UrlClickHandler::Open(url, openContext);
 		};
-		const auto requiresConfirmation = forceConfirmation
+		if (forceConfirmation
 			|| (confirmAfterIvFallback && !canTryIv)
 			|| (HiddenUrlRequiresConfirmation(parsedUrl)
-				&& !skipConfirmation);
-		if (!AyuSettings::getInstance().disableOpenLinkWarning()
-			&& requiresConfirmation) {
+				&& !skipConfirmation)) {
 			if (!my.show) {
 				Core::App().hideMediaView();
 			}

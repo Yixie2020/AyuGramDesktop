@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
 #include "core/file_utilities.h"
+#include "core/update_channel.h"
 #include "core/update_checker.h"
 #include "core/version.h"
 #include "lang/lang_keys.h"
@@ -32,30 +33,39 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
-// AyuGram includes
-#include "window/window_session_controller.h"
-#include "window/window_session_controller_link_info.h"
-
-
 namespace {
 
-rpl::producer<TextWithEntities> Text() {
+rpl::producer<TextWithEntities> Text1() {
+	return tr::lng_about_text1(
+		lt_api_link,
+		tr::lng_about_text1_api(tr::url(u"https://core.telegram.org/api"_q)),
+		tr::marked);
+}
+
+rpl::producer<TextWithEntities> Text2() {
 	return tr::lng_about_text2(
 		lt_gpl_link,
-		rpl::single(Ui::Text::Link(
+		rpl::single(tr::link(
 			"GNU GPL",
-			"https://github.com/AyuGram/AyuGramDesktop/blob/dev/LICENSE")),
+			"https://github.com/telegramdesktop/tdesktop/blob/master/LICENSE")),
 		lt_github_link,
-		rpl::single(Ui::Text::Link(
+		rpl::single(tr::link(
 			"GitHub",
-			"https://github.com/AyuGram/AyuGramDesktop")),
+			"https://github.com/telegramdesktop/tdesktop")),
+		tr::marked);
+}
+
+rpl::producer<TextWithEntities> Text3() {
+	return tr::lng_about_text3(
+		lt_faq_link,
+		tr::lng_about_text3_faq(tr::url(telegramFaqLink())),
 		tr::marked);
 }
 
 } // namespace
 
-void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controller) {
-	box->setTitle(rpl::single(u"AyuGram Desktop"_q));
+void AboutBox(not_null<Ui::GenericBox*> box) {
+	box->setTitle(u"Telegram Desktop"_q);
 
 	auto layout = box->verticalLayout();
 
@@ -73,7 +83,35 @@ void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controll
 			st::boxRowPadding.right(),
 			st::boxRowPadding.bottom()));
 	version->setClickedCallback([=] {
-		File::OpenUrl(Core::App().changelogLink());
+		if (cRealAlphaVersion()) {
+			auto url = u"https://tdesktop.com/"_q;
+			if (Platform::IsWindows32Bit()) {
+				url += u"win/%1.zip"_q;
+			} else if (Platform::IsWindows64Bit()) {
+				url += u"win64/%1.zip"_q;
+			} else if (Platform::IsWindowsARM64()) {
+				url += u"winarm/%1.zip"_q;
+			} else if (Platform::IsMac()) {
+				url += u"mac/%1.zip"_q;
+			} else if (Platform::IsLinux()) {
+				url += u"linux/%1.tar.xz"_q;
+			} else {
+				Unexpected("Platform value.");
+			}
+			url = url.arg(u"talpha%1_%2"_q
+				.arg(cRealAlphaVersion())
+				.arg(Core::countAlphaVersionSignature(cRealAlphaVersion())));
+
+			QGuiApplication::clipboard()->setText(url);
+
+			box->getDelegate()->show(
+				Ui::MakeInformBox(
+					"The link to the current private alpha "
+					"version of Telegram Desktop was copied "
+					"to the clipboard."));
+		} else {
+			File::OpenUrl(Core::App().changelogLink());
+		}
 	});
 
 	Ui::AddSkip(layout, st::aboutTopSkip);
@@ -86,25 +124,39 @@ void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controll
 		Ui::AddSkip(layout, st::aboutSkip);
 	};
 
-	addText(Text());
+	addText(Text1());
+	addText(Text2());
+	addText(Text3());
 
 	box->addButton(tr::lng_close(), [=] { box->closeBox(); });
-	box->addLeftButton(
-		rpl::single(QString("@AyuGramReleases")),
-		[box, controller]
-		{
-			box->closeBox();
-			controller->showPeerByLink(Window::PeerByLinkInfo{
-				.usernameOrId = QString("ayugramreleases"),
-			});
-		});
 
 	box->setWidth(st::aboutWidth);
 }
 
-QString currentVersionText() {
+QString telegramFaqLink() {
+	const auto result = u"https://telegram.org/faq"_q;
+	const auto langpacked = [&](const char *language) {
+		return result + '/' + language;
+	};
+	const auto current = Lang::Id();
+	for (const auto language : { "de", "es", "it", "ko" }) {
+		if (current.startsWith(QLatin1String(language))) {
+			return langpacked(language);
+		}
+	}
+	if (current.startsWith(u"pt-br"_q)) {
+		return langpacked("br");
+	}
+	return result;
+}
+
+namespace {
+
+[[nodiscard]] QString CurrentVersionText(bool withCommit) {
 	auto result = QString::fromLatin1(AppVersionStr);
-	if (cAlphaVersion()) {
+	if (Core::BuildIsCanary) {
+		result += Core::CanaryVersionSuffix();
+	} else if (cAlphaVersion()) {
 		result += u" alpha %1"_q.arg(cAlphaVersion() % 1000);
 	} else if (AppBetaVersion) {
 		result += " beta";
@@ -117,7 +169,22 @@ QString currentVersionText() {
 #ifdef _DEBUG
 	result += " DEBUG";
 #endif
+	if (withCommit
+		&& Core::BuildIsCanary
+		&& Core::CanaryCommitHash[0] != '\0') {
+		result += u" \u00B7 "_q + QLatin1String(Core::CanaryCommitHash);
+	}
 	return result;
+}
+
+} // namespace
+
+QString currentVersionText() {
+	return CurrentVersionText(true);
+}
+
+QString currentVersionShortText() {
+	return CurrentVersionText(false);
 }
 
 void ArchiveHintBox(

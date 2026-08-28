@@ -138,7 +138,7 @@ int64 mtpFileLoader::takeNextRequestOffset() {
 	Expects(readyToRequest());
 
 	const auto result = _nextRequestOffset;
-	_nextRequestOffset += _partSize;
+	_nextRequestOffset += Storage::kDownloadPartSize;
 	return result;
 }
 
@@ -188,8 +188,8 @@ void mtpFileLoader::startLoadingWithPartial(const QByteArray &data) {
 	Expects(data.startsWith("partial:"));
 
 	constexpr auto kPrefix = 8;
-	const auto parts = (data.size() - kPrefix) / _partSize;
-	const auto use = parts * int64(_partSize);
+	const auto parts = (data.size() - kPrefix) / Storage::kDownloadPartSize;
+	const auto use = parts * int64(Storage::kDownloadPartSize);
 	if (use > 0) {
 		_nextRequestOffset = use;
 		feedPart(0, QByteArray::fromRawData(data.data() + kPrefix, use));

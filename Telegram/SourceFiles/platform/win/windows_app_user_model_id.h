@@ -12,9 +12,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Platform {
 namespace AppUserModelId {
 
-[[nodiscard]] QString PinnedIconsPath();
-QString systemShortcutPath();
-
 void CleanupShortcut();
 void CheckPinned();
 

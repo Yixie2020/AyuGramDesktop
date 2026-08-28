@@ -289,9 +289,8 @@ ReactionView::ReactionView(
 
 void ReactionView::setupCustomChatStylePalette() {
 	const auto color = uchar(_data.dark ? 255 : 0);
-	Ui::ChatStyle custom{_chatStyle.get()};
-	custom.historyTextInFg().set(color, color, color, 255);
-	_chatStyle->applyCustomPalette(&custom);
+	_chatStyle->historyTextInFg().set(color, color, color, 255);
+	_chatStyle->applyCustomPalette(_chatStyle.get());
 }
 
 void ReactionView::setAreaGeometry(QRect geometry, float64 radius) {
@@ -356,7 +355,6 @@ void ReactionView::playEffect() {
 		.id = _data.reaction,
 		.miniCopyMultiplier = std::min(1., scaleDown),
 		.effectOnly = true,
-		.haptic = true,
 	};
 	_effect = std::make_unique<Ui::ReactionFlyAnimation>(
 		reactions,
@@ -1255,7 +1253,6 @@ void Reactions::animateAndProcess(Chosen &&chosen) {
 				: wrap->mapFromGlobal(chosen.reaction.globalGeometry)),
 			.scaleOutDuration = scaleOutDuration,
 			.scaleOutTarget = scaleOutTarget,
-			.haptic = true,
 		}, target, std::move(done));
 	}
 }

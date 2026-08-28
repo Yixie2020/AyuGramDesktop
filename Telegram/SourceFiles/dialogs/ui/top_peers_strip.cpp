@@ -24,10 +24,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QApplication>
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
-
-
 namespace Dialogs {
 
 struct TopPeersStrip::Entry {
@@ -834,16 +830,16 @@ void TopPeersStrip::paintUserpic(
 		q.setCompositionMode(QPainter::CompositionMode_Source);
 		const auto onlineSize = st::dialogsOnlineBadgeSize;
 		const auto stroke = st::dialogsOnlineBadgeStroke;
+		const auto skip = st::dialogsOnlineBadgeSkip;
 		const auto shrink = (onlineSize / 2) * (1. - online);
 
 		auto pen = QPen(Qt::transparent);
 		pen.setWidthF(stroke * online);
 		q.setPen(pen);
 		q.setBrush(st::dialogsOnlineBadgeFg);
-		const auto badge = AyuUserpic::OnlineBadgePosition(size, onlineSize, stroke);
 		q.drawEllipse(QRectF(
-			badge.x(),
-			badge.y(),
+			size - skip.x() - onlineSize,
+			size - skip.y() - onlineSize,
 			onlineSize,
 			onlineSize
 		).marginsRemoved({ shrink, shrink, shrink, shrink }));

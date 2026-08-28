@@ -70,10 +70,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_settings_premium.h"
 #include "styles/style_widgets.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-
-
 namespace Settings {
 namespace {
 
@@ -1504,12 +1500,6 @@ base::weak_qptr<Ui::RpWidget> Premium::createPinnedToTop(
 						tr::rich);
 			}
 		}
-
-		const auto &settings = AyuSettings::getInstance();
-		if (settings.localPremium()) {
-			return tr::ayu_LocalPremiumNotice(tr::rich);
-		}
-
 		return rpl::conditional(
 			Data::AmPremiumValue(&controller()->session()),
 			controller()->session().api().premium().statusTextValue(),

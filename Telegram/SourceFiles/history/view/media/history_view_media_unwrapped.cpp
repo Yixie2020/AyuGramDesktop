@@ -23,10 +23,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "styles/style_chat.h"
 
-// AyuGram includes
-#include "ayu/features/message_shot/message_shot.h"
-
-
 namespace HistoryView {
 namespace {
 
@@ -277,7 +273,7 @@ void UnwrappedMedia::drawSurrounding(
 	const auto rightActionSize = _parent->rightActionSize();
 	const auto fullRight = calculateFullRight(inner);
 	auto fullBottom = height();
-	if (needInfoDisplay() && !AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
+	if (needInfoDisplay()) {
 		_parent->drawInfo(
 			p,
 			context,
@@ -394,7 +390,7 @@ void UnwrappedMedia::drawSurrounding(
 			replyRight = rectx + rectw;
 		}
 	}
-	if (rightActionSize && !AyuFeatures::MessageShot::isTakingShot()) {
+	if (rightActionSize) {
 		const auto position = calculateFastActionPosition(
 			inner,
 			rightAligned,

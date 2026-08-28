@@ -16,12 +16,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QApplication>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "window/window_controller.h"
-#include "lang_auto.h"
-
-
 namespace Core {
 
 Tray::Tray() {
@@ -85,7 +79,7 @@ void Tray::rebuildMenu() {
 			_activeForTrayIconAction = Core::App().isActiveForTrayMenu();
 			return _activeForTrayIconAction
 				? tr::lng_minimize_to_tray(tr::now)
-				: tr::lng_open_from_tray(tr::now).replace("Telegram", "AyuGram");
+				: tr::lng_open_from_tray(tr::now);
 		});
 
 		_tray.addAction(
@@ -106,56 +100,7 @@ void Tray::rebuildMenu() {
 			[=] { toggleSoundNotifications(); });
 	}
 
-	const auto &settings = AyuSettings::getInstance();
-
-	if (settings.showGhostToggleInTray()) {
-		auto ghostActiveChanges = AyuSettings::getInstance().useGlobalGhostModeValue()
-			| rpl::map([](bool) {
-				return AyuSettings::ghost().ghostModeActiveValue();
-			})
-			| rpl::flatten_latest();
-
-		auto turnGhostModeText = rpl::combine(
-			_textUpdates.events_starting_with({}),
-			std::move(ghostActiveChanges)
-		) | rpl::map([=](auto, bool active) {
-			return active
-				? tr::ayu_DisableGhostModeTray(tr::now)
-				: tr::ayu_EnableGhostModeTray(tr::now);
-		});
-		_tray.addAction(
-			std::move(turnGhostModeText),
-			[=]
-			{
-				auto &ghost = AyuSettings::ghost();
-				ghost.setGhostModeEnabled(!ghost.isGhostModeActive());
-			});
-	}
-
-	if (settings.showStreamerToggleInTray()) {
-		auto turnStreamerModeText = rpl::combine(
-			_textUpdates.events_starting_with({}),
-			AyuSettings::getInstance().streamerModeValue()
-		) | rpl::map([=](auto, bool enabled) {
-			return enabled
-					   ? tr::ayu_DisableStreamerModeTray(tr::now)
-					   : tr::ayu_EnableStreamerModeTray(tr::now);
-		});
-		_tray.addAction(
-			std::move(turnStreamerModeText),
-			[]
-			{
-				auto &ayuSettings = AyuSettings::getInstance();
-				ayuSettings.setStreamerMode(!ayuSettings.streamerMode());
-			});
-	}
-
-	auto quitText = _textUpdates.events(
-	) | rpl::map([=]
-	{
-		return tr::lng_quit_from_tray(tr::now).replace("Telegram", "AyuGram");
-	});
-	_tray.addAction(std::move(quitText), [] { Core::Quit(); });
+	_tray.addAction(tr::lng_quit_from_tray(), [] { Core::Quit(); });
 
 	TrayAccountsMenu::Fill(_tray);
 

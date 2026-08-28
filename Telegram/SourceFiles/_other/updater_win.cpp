@@ -148,6 +148,8 @@ bool update() {
 		} else {
 			if (versionNum == 0x7FFFFFFF) { // alpha version
 
+			} else if (versionNum == 0x7FFFFFFE) { // v2 canary version
+
 			} else if (!ReadFile(versionFile, &versionLen, sizeof(DWORD), &readLen, NULL) || readLen != sizeof(DWORD) || versionLen > 63) {
 				versionNum = 0;
 			} else if (!ReadFile(versionFile, versionStr, versionLen, &readLen, NULL) || readLen != versionLen) {
@@ -204,7 +206,7 @@ bool update() {
 					writeLog(L"Error: bad update, has Updater.exe! '" + tofname + L"' equal '" + updaterName + L"'");
 					delFolder();
 					return false;
-				} else if (equal(tofname, updateTo + L"AyuGram.exe") && exeName != L"AyuGram.exe") {
+				} else if (equal(tofname, updateTo + L"Telegram.exe") && exeName != L"Telegram.exe") {
 					wstring fullBinaryPath = updateTo + exeName;
 					writeLog(L"Target binary found: '" + tofname + L"', changing to '" + fullBinaryPath + L"'");
 					tofname = fullBinaryPath;
@@ -276,7 +278,7 @@ bool update() {
 }
 
 void updateRegistry() {
-	if (versionNum && versionNum != 0x7FFFFFFF) {
+	if (versionNum && versionNum != 0x7FFFFFFF && versionNum != 0x7FFFFFFE) {
 		writeLog(L"Updating registry..");
 		versionStr[versionLen / 2] = 0;
 		HKEY rkey;
@@ -377,14 +379,14 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 				exeName = args[i];
 				for (int j = 0, l = exeName.size(); j < l; ++j) {
 					if (exeName[j] == L'/' || exeName[j] == L'\\') {
-						exeName = L"AyuGram.exe";
+						exeName = L"Telegram.exe";
 						break;
 					}
 				}
 			}
 		}
 		if (exeName.empty()) {
-			exeName = L"AyuGram.exe";
+			exeName = L"Telegram.exe";
 		}
 		if (needupdate) writeLog(L"Need to update!");
 		if (autostart) writeLog(L"From autostart!");

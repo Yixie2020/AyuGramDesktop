@@ -115,44 +115,6 @@ void BuildTranslator(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	}
 }
 
-void BuildDownloadSpeedBoost(SectionBuilder &builder) {
-	auto *settings = &AyuSettings::getInstance();
-
-	const auto options = std::vector{
-		QString(tr::ayu_DownloadSpeedBoost_Off(tr::now)),
-		QString(tr::ayu_DownloadSpeedBoost_Average(tr::now)),
-		QString(tr::ayu_DownloadSpeedBoost_Extreme(tr::now)),
-	};
-
-	auto currentVal = AyuSettings::getInstance().downloadSpeedBoostValue()
-		| rpl::map([=](DownloadSpeedBoost val) {
-			return options[static_cast<int>(val)];
-		});
-
-	const auto controller = builder.controller();
-	builder.addButton({
-		.id = u"ayu/downloadSpeedBoost"_q,
-		.title = tr::ayu_DownloadSpeedBoost(),
-		.st = &st::settingsButtonNoIcon,
-		.label = std::move(currentVal),
-		.onClick = [=] {
-			controller->show(Box(
-				[=](not_null<Ui::GenericBox*> box) {
-					const auto save = [=](int index) {
-						AyuSettings::getInstance().setDownloadSpeedBoost(
-							static_cast<DownloadSpeedBoost>(index));
-					};
-					SingleChoiceBox(box, {
-						.title = tr::ayu_DownloadSpeedBoost(),
-						.options = options,
-						.initialSelection = static_cast<int>(settings->downloadSpeedBoost()),
-						.callback = save,
-					});
-				}));
-		},
-	});
-}
-
 void BuildShowPeerId(SectionBuilder &builder) {
 	auto *settings = &AyuSettings::getInstance();
 
@@ -309,8 +271,6 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 
 	BuildShowPeerId(builder);
-
-	BuildDownloadSpeedBoost(builder);
 
 	ayu.addSectionDivider();
 

@@ -54,11 +54,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <tgcalls/VideoCaptureInterface.h>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "boxes/abstract_box.h"
-
-
 namespace HistoryView::Controls {
 namespace {
 
@@ -3011,34 +3006,13 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 								? std::numeric_limits<int>::max()
 								: 0),
 						};
-
-						auto sendRoundCallback = crl::guard(
-							this,
-							[=, this](Fn<void()> &&close)
-							{
-								_sendVoiceRequests.fire({
-									.bytes = data.content,
-									//.waveform = {},
-									.duration = data.duration,
-									.options = options,
-									.video = true,
-								});
-								close();
-							});
-
-						const auto &settings = AyuSettings::getInstance();
-						if (settings.roundConfirmation()) {
-							_show->showBox(Ui::MakeConfirmBox(
-								{
-									.text = tr::ayu_ConfirmationRound(),
-									.confirmed = std::move(sendRoundCallback),
-									.confirmText = tr::lng_send_button()
-								}));
-						} else {
-							sendRoundCallback([]
-							{
-							});
-						}
+						_sendVoiceRequests.fire({
+							.bytes = data.content,
+							//.waveform = {},
+							.duration = data.duration,
+							.options = options,
+							.video = true,
+						});
 					}
 				});
 			});
@@ -3057,38 +3031,17 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 
 			window()->raise();
 			window()->activateWindow();
-			auto options = Api::SendOptions{
+			const auto options = Api::SendOptions{
 				.ttlSeconds = (ttlBeforeHide
 					? std::numeric_limits<int>::max()
 					: 0),
 			};
-
-			auto sendVoiceCallback = crl::guard(
-				this,
-				[=, this](Fn<void()> &&close)
-				{
-					_sendVoiceRequests.fire({
-						.bytes = _data.content,
-						.waveform = _data.waveform,
-						.duration = _data.duration,
-						.options = options,
-					});
-					close();
-				});
-
-			const auto &settings = AyuSettings::getInstance();
-			if (settings.voiceConfirmation()) {
-				_show->showBox(Ui::MakeConfirmBox(
-					{
-						.text = tr::ayu_ConfirmationVoice(),
-						.confirmed = std::move(sendVoiceCallback),
-						.confirmText = tr::lng_send_button()
-					}));
-			} else {
-				sendVoiceCallback([]
-				{
-				});
-			}
+			_sendVoiceRequests.fire({
+				.bytes = _data.content,
+				.waveform = _data.waveform,
+				.duration = _data.duration,
+				.options = options,
+			});
 		}));
 	}
 }
@@ -3154,37 +3107,13 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 			_listen->prepareForSendAnimation();
 			_listen->applyTrimBeforeSend();
 		}
-
-		const auto video = !_data.minithumbs.isNull();
-		const auto &settings = AyuSettings::getInstance();
-		auto sendVoiceCallback = crl::guard(
-			this,
-			[=, this](Fn<void()> &&close)
-			{
-				_sendVoiceRequests.fire({
-					.bytes = _data.content,
-					.waveform = _data.waveform,
-					.duration = _data.duration,
-					.options = options,
-					.video = video,
-				});
-				close();
-			});
-
-		if (video ? settings.roundConfirmation() : settings.voiceConfirmation()) {
-			_show->showBox(Ui::MakeConfirmBox(
-				{
-					.text = (video
-						? tr::ayu_ConfirmationRound()
-						: tr::ayu_ConfirmationVoice()),
-					.confirmed = std::move(sendVoiceCallback),
-					.confirmText = tr::lng_send_button()
-				}));
-		} else {
-			sendVoiceCallback([]
-			{
-			});
-		}
+		_sendVoiceRequests.fire({
+			.bytes = _data.content,
+			.waveform = _data.waveform,
+			.duration = _data.duration,
+			.options = options,
+			.video = !_data.minithumbs.isNull(),
+		});
 	}
 }
 

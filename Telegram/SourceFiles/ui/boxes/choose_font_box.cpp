@@ -28,11 +28,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtGui/QFontDatabase>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ui/chat/chat_style_radius.h"
-
-
 namespace Ui {
 namespace {
 
@@ -641,7 +636,7 @@ void PreviewPainter::validateBubbleCache() {
 	if (!_bubbleCorners.p[0].isNull()) {
 		return;
 	}
-	const auto radius = Ui::BubbleRadiusLarge();
+	const auto radius = st::bubbleRadiusLarge;
 	_bubbleCorners = Ui::PrepareCornerPixmaps(radius, _msgBg.color());
 	_bubbleCorners.p[2] = {};
 	_bubbleShadowBottomRight
@@ -672,15 +667,13 @@ void PreviewPainter::paintReply(Painter &p) {
 			outline,
 			_replyRect.height());
 		p.drawRoundedRect(_replyRect, radius, radius);
-		if (!AyuSettings::getInstance().simpleQuotesAndReplies()) {
-			p.setOpacity(Ui::kDefaultBgOpacity);
-			p.setClipRect(
-				_replyRect.x() + outline,
-				_replyRect.y(),
-				_replyRect.width() - outline,
-				_replyRect.height());
-			p.drawRoundedRect(_replyRect, radius, radius);
-		}
+		p.setOpacity(Ui::kDefaultBgOpacity);
+		p.setClipRect(
+			_replyRect.x() + outline,
+			_replyRect.y(),
+			_replyRect.width() - outline,
+			_replyRect.height());
+		p.drawRoundedRect(_replyRect, radius, radius);
 	}
 	p.setOpacity(1.);
 	p.setClipping(false);

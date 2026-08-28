@@ -8,6 +8,7 @@
 
 #include "lang_auto.h"
 #include "tray.h"
+#include "ayu/ayu_ui_settings.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
 #include "ayu/ui/ayu_logo.h"
@@ -498,7 +499,6 @@ void AyuSettings::validate() {
 	};
 
 	validateEnum(_showPeerId, defaults._showPeerId);
-	validateEnum(_downloadSpeedBoost, defaults._downloadSpeedBoost);
 	validateEnum(_channelBottomButton, defaults._channelBottomButton);
 	validateEnum(_showReactionsPanelInContextMenu, defaults._showReactionsPanelInContextMenu);
 	validateEnum(_showViewsPanelInContextMenu, defaults._showViewsPanelInContextMenu);
@@ -517,7 +517,6 @@ void AyuSettings::validate() {
 
 	validateRange(_messageBubbleRadius, 0, 16, defaults._messageBubbleRadius);
 	validateRange(_wideMultiplier, 0.5, 4.0, defaults._wideMultiplier);
-	validateRange(_recentStickersCount, 1, 200, defaults._recentStickersCount);
 	validateRange(_avatarCorners, 0, AyuUiSettings::kMaxAvatarCorners, defaults._avatarCorners);
 
 	const auto embeddedType = _messageShotSettings._embeddedThemeType.current();
@@ -542,12 +541,6 @@ void AyuSettings::setSaveDeletedMessages(bool val) {
 void AyuSettings::setSaveMessagesHistory(bool val) {
 	if (_saveMessagesHistory.current() == val) return;
 	_saveMessagesHistory = val;
-	save();
-}
-
-void AyuSettings::setKeepForbiddenChats(bool val) {
-	if (_keepForbiddenChats.current() == val) return;
-	_keepForbiddenChats = val;
 	save();
 }
 
@@ -665,6 +658,7 @@ void AyuSettings::setIncreaseWebviewWidth(bool val) {
 void AyuSettings::setMaterialSwitches(bool val) {
 	if (_materialSwitches.current() == val) return;
 	_materialSwitches = val;
+	AyuUiSettings::setMaterialSwitches(val);
 	repaintApp();
 	save();
 }
@@ -981,12 +975,6 @@ void AyuSettings::setShowPeerId(PeerIdDisplay val) {
 	save();
 }
 
-void AyuSettings::setDownloadSpeedBoost(DownloadSpeedBoost val) {
-	if (_downloadSpeedBoost.current() == val) return;
-	_downloadSpeedBoost = val;
-	save();
-}
-
 void AyuSettings::setShowMessageSeconds(bool val) {
 	if (_showMessageSeconds.current() == val) return;
 	_showMessageSeconds = val;
@@ -1063,6 +1051,7 @@ void AyuSettings::setCrashReporting(bool val) {
 void AyuSettings::setAvatarCorners(int val) {
 	if (_avatarCorners.current() == val) return;
 	_avatarCorners = val;
+	AyuUiSettings::setAvatarCorners(val);
 	save();
 }
 
@@ -1091,7 +1080,6 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"useGlobalGhostMode", s._useGlobalGhostMode.current()},
 		{"saveDeletedMessages", s._saveDeletedMessages.current()},
 		{"saveMessagesHistory", s._saveMessagesHistory.current()},
-		{"keepForbiddenChats", s._keepForbiddenChats.current()},
 		{"saveForBots", s._saveForBots.current()},
 		{"shadowBanIds", s._shadowBanIds},
 		{"filtersEnabled", s._filtersEnabled.current()},
@@ -1163,7 +1151,6 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"quickAdminShortcuts", s._quickAdminShortcuts.current()},
 		{"disableGreetingSticker", s._disableGreetingSticker.current()},
 		{"showPeerId", s._showPeerId.current()},
-		{"downloadSpeedBoost", s._downloadSpeedBoost.current()},
 		{"showMessageSeconds", s._showMessageSeconds.current()},
 		{"showMessageShot", s._showMessageShot.current()},
 		{"filterZalgo", s._filterZalgo.current()},
@@ -1197,7 +1184,6 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._useGlobalGhostMode = j.value("useGlobalGhostMode", defaults._useGlobalGhostMode.current());
 	s._saveDeletedMessages = j.value("saveDeletedMessages", defaults._saveDeletedMessages.current());
 	s._saveMessagesHistory = j.value("saveMessagesHistory", defaults._saveMessagesHistory.current());
-	s._keepForbiddenChats = j.value("keepForbiddenChats", defaults._keepForbiddenChats.current());
 	s._saveForBots = j.value("saveForBots", defaults._saveForBots.current());
 	s._shadowBanIds = j.value("shadowBanIds", defaults._shadowBanIds);
 	s._filtersEnabled = j.value("filtersEnabled", defaults._filtersEnabled.current());
@@ -1269,7 +1255,6 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._quickAdminShortcuts = j.value("quickAdminShortcuts", defaults._quickAdminShortcuts.current());
 	s._disableGreetingSticker = j.value("disableGreetingSticker", defaults._disableGreetingSticker.current());
 	s._showPeerId = j.value("showPeerId", defaults._showPeerId.current());
-	s._downloadSpeedBoost = j.value("downloadSpeedBoost", defaults._downloadSpeedBoost.current());
 	s._showMessageSeconds = j.value("showMessageSeconds", defaults._showMessageSeconds.current());
 	s._showMessageShot = j.value("showMessageShot", defaults._showMessageShot.current());
 	s._filterZalgo = j.value("filterZalgo", defaults._filterZalgo.current());

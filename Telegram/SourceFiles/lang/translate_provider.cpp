@@ -18,11 +18,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/translate_url_provider.h"
 #include "platform/platform_translate_provider.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/translator/ayu_translate_provider.h"
-
-
 namespace {
 
 base::options::option<QString> OptionTranslateUrlTemplate({
@@ -31,15 +26,6 @@ base::options::option<QString> OptionTranslateUrlTemplate({
 	.description = "Template URL for custom translation provider."
 		" Supports %q text, %f source language and %t target language.",
 });
-
-[[nodiscard]] TranslationProvider ResolveTranslateProvider() {
-	const auto provider = AyuSettings::getInstance().translationProvider();
-	if ((provider == TranslationProvider::Native)
-		&& !Platform::IsTranslateProviderAvailable()) {
-		return TranslationProvider::Telegram;
-	}
-	return provider;
-}
 
 } // namespace
 
@@ -52,18 +38,9 @@ std::unique_ptr<TranslateProvider> CreateTranslateProvider(
 		&& urlTemplate.contains(u"%q"_q)) {
 		return CreateUrlTranslateProvider(urlTemplate);
 	}
-	const auto provider = ResolveTranslateProvider();
-	switch (provider) {
-	case TranslationProvider::Google:
-	case TranslationProvider::Yandex:
-		return CreateAyuTranslateProvider(session, provider);
-	case TranslationProvider::Native:
-		if (auto native = Platform::CreateTranslateProvider()) {
-			return native;
-		}
-		break;
-	case TranslationProvider::Telegram:
-		break;
+	if (Core::App().settings().usePlatformTranslation()
+		&& Platform::IsTranslateProviderAvailable()) {
+		return Platform::CreateTranslateProvider();
 	}
 	return CreateMTProtoTranslateProvider(session);
 }

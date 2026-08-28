@@ -40,12 +40,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 #include "styles/style_chat.h"
 
-// AyuGram includes
-#include "ayu/ui/context_menu/context_menu.h"
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/qt_key_modifiers_extended.h"
-
-
 namespace HistoryView::Reactions {
 namespace {
 
@@ -859,7 +853,15 @@ void Selector::finishExpand() {
 }
 
 void Selector::paintBubble(QPainter &p, int innerWidth) {
-	// AyuGram: removed
+	const auto &bubble = _st.icons.stripBubble;
+	const auto bubbleRight = std::min(
+		st::reactStripBubbleRight,
+		(innerWidth - bubble.width()) / 2);
+	bubble.paint(
+		p,
+		_inner.x() + innerWidth - bubbleRight - bubble.width(),
+		_inner.y() + _inner.height() - _outer.y(),
+		width());
 }
 
 void Selector::paintEvent(QPaintEvent *e) {
@@ -1437,18 +1439,6 @@ AttachSelectorResult AttachSelectorToMenu(
 		Fn<void(ChosenReaction)> chosen,
 		TextWithEntities about,
 		IconFactory iconFactory) {
-	const auto &settings = AyuSettings::getInstance();
-	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu())) {
-		return AttachSelectorResult::Skipped;
-	}
-
-	const auto peer = item->history()->peer;
-	if ((peer->isChannel() && !peer->isMegagroup() && !settings.showChannelReactions())
-		|| (peer->isMegagroup() && !settings.showGroupReactions())
-		|| (peer->isUser() && !settings.showPrivateChatReactions())) {
-		return AttachSelectorResult::Skipped;
-	}
-
 	const auto result = AttachSelectorToMenu(
 		menu,
 		desiredPosition,
@@ -1464,9 +1454,7 @@ AttachSelectorResult AttachSelectorToMenu(
 	const auto itemId = item->fullId();
 
 	selector->chosen() | rpl::on_next([=](ChosenReaction reaction) {
-		if (!base::IsExtendedContextMenuModifierPressed()) {
-			menu->hideMenu();
-		}
+		menu->hideMenu();
 		reaction.context = itemId;
 		chosen(std::move(reaction));
 	}, selector->lifetime());
@@ -1498,11 +1486,6 @@ auto AttachSelectorToMenu(
 	IconFactory iconFactory,
 	Fn<bool()> paused)
 -> base::expected<not_null<Selector*>, AttachSelectorResult> {
-	const auto &settings = AyuSettings::getInstance();
-	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu())) {
-		return base::make_unexpected(AttachSelectorResult::Skipped);
-	}
-
 	if (reactions.recent.empty()) {
 		return base::make_unexpected(AttachSelectorResult::Skipped);
 	}

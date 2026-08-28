@@ -28,11 +28,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "layout/layout_selection.h"
 #include "styles/style_chat.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/message_shot/message_shot.h"
-
-
 namespace HistoryView {
 namespace {
 
@@ -451,28 +446,6 @@ void GroupedMedia::draw(Painter &p, const PaintContext &context) const {
 	const auto tagged = lookupSpoilerTagMedia();
 	auto fullRect = QRect();
 	const auto subpartHighlight = IsSubGroupSelection(highlight);
-
-	auto anyDeleted = false;
-	const auto &settings = AyuSettings::getInstance();
-	const auto perItemOpacityEnabled = settings.semiTransparentDeletedMessages();
-	if (!perItemOpacityEnabled) {
-		for (const auto &part : _parts) {
-			part.deletedAnimation.stop();
-		}
-	}
-	if (perItemOpacityEnabled) {
-		for (const auto &part : _parts) {
-			if (part.item->isDeleted()) {
-				anyDeleted = true;
-			}
-		}
-	}
-	const auto perItemDeletedOpacity = perItemOpacityEnabled
-		&& anyDeleted;
-	const auto elementDeletedOpacity = perItemDeletedOpacity
-		? _parent->deletedOpacity()
-		: 1.;
-
 	for (auto i = 0, count = int(_parts.size()); i != count; ++i) {
 		const auto &part = _parts[i];
 		auto partContext = context.withSelection(fullSelection
@@ -499,50 +472,15 @@ void GroupedMedia::draw(Painter &p, const PaintContext &context) const {
 		if (!part.cache.isNull()) {
 			wasCache = true;
 		}
-		if (perItemDeletedOpacity && part.item->isDeleted()) {
-			if (part.item->wasDeletedAnimated()
-				&& !part.deletedAnimation.animating()) {
-				part.deletedAnimation.start(
-					[parent = _parent] {
-						if (!AyuSettings::getInstance().semiTransparentDeletedMessages()) {
-							return false;
-						}
-						parent->repaint();
-						return true;
-					},
-					1.,
-					0.7,
-					500,
-					anim::easeOutCubic);
-				part.item->markDeletedAnimated();
-			}
-			const auto itemOpacity = part.deletedAnimation.value(0.7);
-			const auto adjustedOpacity = (elementDeletedOpacity > 0.)
-				? (itemOpacity / elementDeletedOpacity)
-				: 0.;
-			const auto savedOp = p.opacity();
-			p.setOpacity(savedOp * adjustedOpacity);
-			part.content->drawGrouped(
-				p,
-				partContext,
-				part.geometry.translated(0, groupPadding.top()),
-				part.sides,
-				applyRoundingSides(rounding, part.sides),
-				highlightOpacity,
-				&part.cacheKey,
-				&part.cache);
-			p.setOpacity(savedOp);
-		} else {
-			part.content->drawGrouped(
-				p,
-				partContext,
-				part.geometry.translated(0, groupPadding.top()),
-				part.sides,
-				applyRoundingSides(rounding, part.sides),
-				highlightOpacity,
-				&part.cacheKey,
-				&part.cache);
-		}
+		part.content->drawGrouped(
+			p,
+			partContext,
+			part.geometry.translated(0, groupPadding.top()),
+			part.sides,
+			applyRoundingSides(rounding, part.sides),
+			highlightOpacity,
+			&part.cacheKey,
+			&part.cache);
 		if (!part.cache.isNull()) {
 			nowCache = true;
 		}
@@ -566,7 +504,7 @@ void GroupedMedia::draw(Painter &p, const PaintContext &context) const {
 	if (_parent->media() == this && (!_parent->hasBubble() || isBubbleBottom())) {
 		auto fullRight = width();
 		auto fullBottom = height();
-		if (needInfoDisplay() && !AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
+		if (needInfoDisplay()) {
 			_parent->drawInfo(
 				p,
 				context,
@@ -854,10 +792,6 @@ bool GroupedMedia::applyGroup(const DataMediaRange &medias) {
 
 	auto modeChosen = false;
 	for (const auto media : medias) {
-		if (!media) {
-			continue; // AyuGram: fix ebe44780-7c8b-4964-ba31-b747c947254f
-		}
-
 		const auto mediaMode = DetectMode(media);
 		if (!modeChosen) {
 			_mode = mediaMode;
@@ -898,12 +832,6 @@ not_null<Media*> GroupedMedia::main() const {
 void GroupedMedia::hideSpoilers() {
 	for (const auto &part : _parts) {
 		part.content->hideSpoilers();
-	}
-}
-
-void GroupedMedia::revealSpoilers() {
-	for (const auto &part : _parts) {
-		part.content->revealSpoilers();
 	}
 }
 
@@ -1033,9 +961,6 @@ bool GroupedMedia::computeNeedBubble() const {
 }
 
 bool GroupedMedia::needInfoDisplay() const {
-	if (AyuFeatures::MessageShot::isTakingShot()) {
-		return (_mode != Mode::Column);
-	}
 	const auto item = _parent->data();
 	return (_mode != Mode::Column)
 		&& (item->isSending()

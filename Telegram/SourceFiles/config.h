@@ -20,7 +20,7 @@ enum {
 
 	PreloadHeightsCount = 3, // when 3 screens to scroll left make a preload request
 
-	SearchPeopleLimit = 20,
+	SearchPeopleLimit = 5,
 
 	WebPageUserId = 701000,
 
@@ -34,9 +34,9 @@ enum {
 
 inline const char *cGUIDStr() {
 #ifndef OS_MAC_STORE
-	static const char *gGuidStr = "{87A94AB0-E370-4cde-98D3-ACC110C59666}";
+	static const char *gGuidStr = "{87A94AB0-E370-4cde-98D3-ACC110C5967D}";
 #else // OS_MAC_STORE
-	static const char *gGuidStr = "{E51FB841-8C0B-4EF9-9E9E-5A0078567666}";
+	static const char *gGuidStr = "{E51FB841-8C0B-4EF9-9E9E-5A0078567627}";
 #endif // OS_MAC_STORE
 
 	return gGuidStr;
@@ -44,9 +44,9 @@ inline const char *cGUIDStr() {
 
 static const char *UpdatesPublicKey = "\
 -----BEGIN RSA PUBLIC KEY-----\n\
-MIGJAoGBAOIENxe1sfT2t7b+HUMpnT6RnN/sCqY0JjK7/1A/59daDc6i/K4023jw\n\
-Us+187Pa2VSaPh3kDywp9PfLDFgFiPTD9BsBvpaSK9p3zyG8k6an3+GbUTlUgmFv\n\
-eI0pg7vmceIl0Lcy9nndfEx27UQId3Y3dQTMuwwFYGtjJAMHNNq5AgMBAAE=\n\
+MIGJAoGBAMA4ViQrjkPZ9xj0lrer3r23JvxOnrtE8nI69XLGSr+sRERz9YnUptnU\n\
+BZpkIfKaRcl6XzNJiN28cVwO1Ui5JSa814UAiDHzWUqCaXUiUEQ6NmNTneiGx2sQ\n\
++9PKKlb8mmr3BB9A45ZNwLT6G9AK3+qkZLHojeSA+m84/a6GP4svAgMBAAE=\n\
 -----END RSA PUBLIC KEY-----\
 ";
 

@@ -26,10 +26,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_media_view.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-
-
 namespace Media::Stories {
 
 RepostView::RepostView(
@@ -99,9 +95,7 @@ void RepostView::draw(Painter &p, int x, int y, int availableWidth) {
 	cache->bg = QColor(0, 0, 0, 64);
 	Ui::Text::ValidateQuotePaintCache(*cache, quoteSt);
 	Ui::Text::FillQuotePaint(p, rect, *cache, quoteSt);
-
-	const auto &settings = AyuSettings::getInstance();
-	if (!settings.simpleQuotesAndReplies() && backgroundEmoji) {
+	if (backgroundEmoji) {
 		using namespace HistoryView;
 		if (backgroundEmoji->firstFrameMask.isNull()
 			&& !backgroundEmoji->emoji) {
@@ -127,7 +121,7 @@ void RepostView::draw(Painter &p, int x, int y, int availableWidth) {
 	cache->bg = rippleColor;
 
 	if (_ripple) {
-		_ripple->paint(p, x, y, w, &cache->bg);
+		_ripple->paint(p, x, y, w, &rippleColor);
 		if (_ripple->empty()) {
 			_ripple.reset();
 		}

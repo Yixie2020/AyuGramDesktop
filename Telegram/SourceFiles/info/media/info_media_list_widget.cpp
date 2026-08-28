@@ -1663,14 +1663,21 @@ void ListWidget::showContextMenu(
 		}
 		if (const auto peer = _controller->key().storiesPeer()) {
 			if (!peer->isSelf() && IsStoryMsgId(globalId.itemId.msg)) {
-				::Media::Stories::AddStealthModeMenu(
-					Ui::Menu::CreateAddActionCallback(_contextMenu),
-					peer,
-					_controller->parentController());
 				const auto storyId = FullStoryId{
 					globalId.itemId.peer,
 					StoryIdFromMsgId(globalId.itemId.msg),
 				};
+				const auto albumId = _controller->storiesAlbumId();
+				::Media::Stories::AddStealthModeMenu(
+					Ui::Menu::CreateAddActionCallback(_contextMenu),
+					peer,
+					_controller->parentController(),
+					crl::guard(this, [=] {
+						_controller->parentController()->openPeerStory(
+							peer,
+							storyId.story,
+							{ Data::StoriesContextAlbum{ albumId } });
+					}));
 				_contextMenu->addAction(
 					tr::lng_profile_report(tr::now),
 					[=] { ::Media::Stories::ReportRequested(
@@ -2218,7 +2225,7 @@ void ListWidget::mouseActionUpdate(const QPoint &globalPosition) {
 		Ui::Tooltip::Hide();
 	}
 	if (dragState.link) {
-		Ui::Tooltip::Show(350, this);
+		Ui::Tooltip::Show(1000, this);
 	}
 
 	if (_mouseAction == MouseAction::None) {

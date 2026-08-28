@@ -479,9 +479,6 @@ public:
 		PeerId targetPeerId,
 		PeerId fromPeerId);
 
-	[[nodiscard]] std::unique_ptr<TaskQueue> &fileLoader() {
-		return _fileLoader;
-	}
 private:
 	struct MessageDataRequest {
 		using Callbacks = std::vector<Fn<void()>>;
