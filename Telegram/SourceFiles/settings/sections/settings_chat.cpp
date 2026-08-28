@@ -195,6 +195,7 @@ ColorsPalette::Button::Button(
 , _colors(std::move(colors))
 , _selected(selected) {
 	_widget.show();
+	_widget.setIsListItem(true);
 	_widget.resize(st::settingsAccentColorSize, st::settingsAccentColorSize);
 	_widget.paintRequest(
 	) | rpl::on_next([=] {
@@ -2274,6 +2275,8 @@ void SetupChatListQuickAction(
 					? tr::lng_settings_quick_dialog_action_pin
 					: (value == Dialogs::Ui::QuickDialogAction::Read)
 					? tr::lng_settings_quick_dialog_action_read
+					: (value == Dialogs::Ui::QuickDialogAction::Delete)
+					? tr::lng_settings_quick_dialog_action_delete
 					: (value == Dialogs::Ui::QuickDialogAction::Archive)
 					? tr::lng_settings_quick_dialog_action_archive
 					: tr::lng_settings_quick_dialog_action_disabled)();
@@ -2885,6 +2888,9 @@ void SetupThemeSettings(
 		std::move(label),
 		st::settingsButton,
 		{ &st::menuIconFont });
+	const auto themeLifetime = container->lifetime().make_state<
+		rpl::lifetime
+	>();
 	fontButton->setClickedCallback([=] {
 		const auto save = [=](QString chosen) {
 			*family = chosen;
@@ -2893,8 +2899,11 @@ void SetupThemeSettings(
 			Core::Restart();
 		};
 
+		// Not container->lifetime(): that outlives the box, so every tap
+		// left another dead background subscription behind in it.
+		themeLifetime->destroy();
 		const auto theme = std::shared_ptr<Ui::ChatTheme>(
-			Window::Theme::DefaultChatThemeOn(container->lifetime()));
+			Window::Theme::DefaultChatThemeOn(*themeLifetime));
 		const auto generateBg = [=] {
 			const auto size = st::boxWidth;
 			const auto ratio = style::DevicePixelRatio();

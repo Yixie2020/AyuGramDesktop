@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
 #include "data/data_message_reactions.h"
+#include "data/data_messages.h"
 #include "data/data_poll.h"
 #include "data/data_premium_limits.h"
 #include "data/data_session.h"
@@ -30,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "history/view/controls/history_view_suggest_options.h"
 #include "history/history.h"
+#include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
@@ -53,10 +55,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/checkbox.h"
 #include "ui/item_text_options.h"
 #include "lang/lang_keys.h"
-
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
 
 #include "styles/style_layers.h"
 
@@ -625,11 +623,6 @@ QString NewMessagePostAuthor(const Api::SendAction &action) {
 bool ShouldSendSilent(
 		not_null<PeerData*> peer,
 		const Api::SendOptions &options) {
-	const auto &ghost = AyuSettings::ghost(&peer->session());
-	if (ghost.shouldSendWithoutSound()) {
-		return !options.silent;
-	}
-
 	return options.silent
 		|| (peer->isBroadcast()
 			&& peer->owner().notifySettings().silentPosts(peer))
@@ -658,6 +651,50 @@ MsgId LookupReplyToTop(not_null<History*> history, FullReplyTo replyTo) {
 bool LookupReplyIsTopicPost(HistoryItem *replyTo) {
 	return replyTo
 		&& (replyTo->topicRootId() != Data::ForumTopic::kGeneralId);
+}
+
+bool CanReplyToEphemeral(not_null<const HistoryItem*> item) {
+	const auto &session = item->history()->session();
+	return session.ephemeralMessages().replyBot(item) != nullptr;
+}
+
+bool IsAnchoredEphemeral(not_null<const HistoryItem*> item) {
+	const auto &session = item->history()->session();
+	return session.ephemeralMessages().anchored(item);
+}
+
+std::vector<ForwardRange> CollectForwardRanges(
+		const std::vector<not_null<HistoryItem*>> &items) {
+	auto ordered = items;
+	ranges::sort(ordered, ranges::less(), &HistoryItem::position);
+	auto result = std::vector<ForwardRange>();
+	for (const auto &item : ordered) {
+		const auto fromEphemeral = item->isEphemeral();
+		if (fromEphemeral
+			&& !item->history()->session().ephemeralMessages().lookupId(
+				item)) {
+			continue;
+		}
+		if (result.empty()
+			|| result.back().fromEphemeral != fromEphemeral) {
+			result.push_back({ .fromEphemeral = fromEphemeral });
+		}
+		result.back().items.push_back(item);
+	}
+	return result;
+}
+
+QVector<MTPint> ForwardRangeIds(
+		not_null<Main::Session*> session,
+		const ForwardRange &range) {
+	auto result = QVector<MTPint>();
+	result.reserve(int(range.items.size()));
+	for (const auto &item : range.items) {
+		result.push_back(range.fromEphemeral
+			? MTP_int(session->ephemeralMessages().lookupId(item))
+			: MTP_int(item->id));
+	}
+	return result;
 }
 
 bool ShowEphemeralReplyTextOnlyError(
@@ -717,10 +754,6 @@ void ConfirmDeleteSelectedEphemeral(
 TextWithEntities DropDisallowedCustomEmoji(
 		not_null<PeerData*> to,
 		TextWithEntities text) {
-	if (true) { // AyuGram: allow all premium emojis (via tg://emoji?id=...)
-		return text;
-	}
-
 	if (to->session().premium() || to->isSelf()) {
 		return text;
 	}
@@ -981,16 +1014,15 @@ MTPMessageReplyHeader NewMessageReplyHeader(const Api::SendAction &action) {
 		const auto replyToTop = LookupReplyToTop(action.history, replyTo);
 		const auto topicPost = replyTo.topicRootId
 			&& (replyTo.topicRootId != Data::ForumTopic::kGeneralId);
-		const auto quoteNormalized = reverseLocalPremiumEmoji(replyTo.quote, action.history, true);
 		auto quoteEntities = Api::EntitiesToMTP(
 			&action.history->session(),
-			quoteNormalized.entities,
+			replyTo.quote.entities,
 			Api::ConvertOption::SkipLocal);
 		return MTP_messageReplyHeader(
 			MTP_flags(Flag::f_reply_to_msg_id
 				| (replyToTop ? Flag::f_reply_to_top_id : Flag())
 				| (externalPeerId ? Flag::f_reply_to_peer_id : Flag())
-				| (quoteNormalized.empty()
+				| (replyTo.quote.empty()
 					? Flag()
 					: (Flag::f_quote
 						| Flag::f_quote_text
@@ -1043,31 +1075,31 @@ MediaCheckResult CheckMessageMedia(const MTPMessageMedia &media) {
 		});
 	}, [](const MTPDmessageMediaPhoto &data) {
 		const auto photo = data.vphoto();
-		if (data.vttl_seconds()) {
-			return Result::HasUnsupportedTimeToLive;
-		} else if (!photo) {
-			return Result::Empty;
+		if (!photo) {
+			return data.vttl_seconds()
+				? Result::HasExpiredMediaTimeToLive
+				: Result::Empty;
 		}
 		return photo->match([](const MTPDphoto &) {
 			return Result::Good;
-		}, [](const MTPDphotoEmpty &) {
-			return Result::Empty;
+		}, [&](const MTPDphotoEmpty &) {
+			return data.vttl_seconds()
+				? Result::HasExpiredMediaTimeToLive
+				: Result::Empty;
 		});
 	}, [](const MTPDmessageMediaDocument &data) {
 		const auto document = data.vdocument();
-		if (data.vttl_seconds()) {
-			if (data.is_video()) {
-				return Result::HasUnsupportedTimeToLive;
-			} else if (!document) {
-				return Result::HasExpiredMediaTimeToLive;
-			}
-		} else if (!document) {
-			return Result::Empty;
+		if (!document) {
+			return data.vttl_seconds()
+				? Result::HasExpiredMediaTimeToLive
+				: Result::Empty;
 		}
 		return document->match([](const MTPDdocument &) {
 			return Result::Good;
-		}, [](const MTPDdocumentEmpty &) {
-			return Result::Empty;
+		}, [&](const MTPDdocumentEmpty &) {
+			return data.vttl_seconds()
+				? Result::HasExpiredMediaTimeToLive
+				: Result::Empty;
 		});
 	}, [](const MTPDmessageMediaWebPage &data) {
 		return data.vwebpage().match([](const MTPDwebPage &) {
@@ -1272,14 +1304,6 @@ void CheckReactionNotificationSchedule(
 	if (from == Api::ReactionsNotifyFrom::None) {
 		return;
 	}
-	const auto peer = item->history()->peer;
-	const auto &settings = AyuSettings::getInstance();
-	if ((peer->isChannel() && !peer->isMegagroup() && !settings.showChannelReactions())
-		|| (peer->isMegagroup() && !settings.showGroupReactions())
-		|| (peer->isUser() && !settings.showPrivateChatReactions())) {
-		item->markEffectWatched();
-		return;
-	}
 	for (const auto &[emoji, reactions] : item->recentReactions()) {
 		for (const auto &reaction : reactions) {
 			if (!reaction.unread) {
@@ -1309,11 +1333,15 @@ void CheckReactionNotificationSchedule(
 	}
 }
 
+PollData *LookupNotificationPoll(not_null<const HistoryItem*> item) {
+	const auto media = item->media();
+	return media ? media->poll() : nullptr;
+}
+
 void CheckPollVoteNotificationSchedule(
 		not_null<HistoryItem*> item,
 		const std::vector<not_null<PeerData*>> &wasRecentVoters) {
-	const auto media = item->media();
-	const auto poll = media ? media->poll() : nullptr;
+	const auto poll = LookupNotificationPoll(item);
 	if (!poll || !poll->creator()) {
 		return;
 	}
@@ -1325,7 +1353,9 @@ void CheckPollVoteNotificationSchedule(
 	for (const auto &answer : poll->answers) {
 		for (const auto &voter : answer.recentVoters) {
 			const auto user = voter->asUser();
-			if (!user || ranges::contains(wasRecentVoters, voter)) {
+			if (!user
+				|| user->isSelf()
+				|| ranges::contains(wasRecentVoters, voter)) {
 				continue;
 			}
 			if (from == Api::ReactionsNotifyFrom::Contacts
@@ -1346,6 +1376,10 @@ void CheckPollVoteNotificationSchedule(
 			return;
 		}
 	}
+}
+
+bool CanHoldItemNotification(not_null<const HistoryItem*> item) {
+	return item->isHistoryEntry() || LookupNotificationPoll(item);
 }
 
 [[nodiscard]] MessageFlags NewForwardedFlags(
@@ -1399,28 +1433,14 @@ void CheckPollVoteNotificationSchedule(
 }
 
 [[nodiscard]] TextWithEntities UnsupportedMessageText() {
-	const auto siteLink = u"https://t.me/AyuGramReleases"_q;
+	const auto siteLink = u"https://desktop.telegram.org"_q;
 	auto result = TextWithEntities{
-		tr::lng_message_unsupported(tr::now, lt_link, siteLink).replace("Telegram", "AyuGram")
+		tr::lng_message_unsupported(tr::now, lt_link, siteLink)
 	};
 	TextUtilities::ParseEntities(result, Ui::ItemTextNoMonoOptions().flags);
 	result.entities.push_front(
 		EntityInText(EntityType::Italic, 0, result.text.size()));
 	return result;
-}
-
-HistoryMessageMarkupData UnsupportedMessageMarkup() {
-	using Button = HistoryMessageMarkupButton;
-	auto markup = HistoryMessageMarkupData();
-	markup.flags = ReplyMarkupFlag::Inline;
-	auto row = std::vector<Button>();
-	row.emplace_back(
-		Button::Type::Url,
-		tr::lng_update_telegram(tr::now),
-		Button::Visual(),
-		QByteArray("https://desktop.telegram.org"));
-	markup.rows.push_back(std::move(row));
-	return markup;
 }
 
 void ShowTrialTranscribesToast(int left, TimeId until) {

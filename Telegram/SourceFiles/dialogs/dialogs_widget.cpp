@@ -109,8 +109,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
-#include "ayu/utils/taptic_engine/taptic_engine.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "base/platform/base_platform_haptic.h"
 
 
 namespace Dialogs {
@@ -1254,6 +1254,12 @@ void Widget::scrollToDefaultChecked(bool verytop) {
 }
 
 void Widget::setupScrollUpButton() {
+	// The button floats over the bottom of the list, but it is created long
+	// before it, so the scroll has to order the two - and it is an overlay,
+	// not something laid out beside the list.
+	_scroll->setVisualTabOrder(true);
+	_scrollToTop->setVisualTabOrderOverlay(true);
+
 	_scrollToTop->setClickedCallback([=] { scrollToDefaultChecked(); });
 	_scrollToTop->setAccessibleName(tr::lng_sr_scroll_to_top(tr::now));
 	trackScroll(_scrollToTop);
@@ -1649,8 +1655,12 @@ void Widget::setupDownloadBar() {
 						return;
 					}
 				}
-				if (first) {
+				if (first && first->isHistoryEntry()) {
 					controller()->showMessage(first);
+				} else if (first) {
+					controller()->showSection(
+						Info::Downloads::Make(
+							controller()->session().user()));
 				}
 			}, _downloadBar->lifetime());
 
@@ -1851,7 +1861,7 @@ void Widget::setupStories() {
 			storiesToggleExplicitExpand(true);
 			_scroll->setOverscrollDefaults(0, 0);
 		} else {
-			TapticEngine::generateLevelChange();
+			base::Platform::Haptic();
 			_scroll->setOverscrollDefaults(
 				-st::dialogsStoriesFull.height,
 				0);
@@ -2379,7 +2389,7 @@ void Widget::collectStoriesUserpicsViews(Data::StorySourcesList list) {
 		? _storiesUserpicsViewsHidden
 		: _storiesUserpicsViewsShown;
 	map.clear();
-	auto &owner = session().data();
+	const auto &owner = session().data();
 	for (const auto &source : owner.stories().sources(list)) {
 		if (const auto peer = owner.peerLoaded(source.id)) {
 			if (auto view = peer->activeUserpicView(); view.cloud) {
@@ -2833,6 +2843,12 @@ void Widget::updateStoriesVisibility() {
 		|| (pulledDown && hiddenAnimated);
 	const auto hidden = hiddenInstant || hiddenAnimated;
 	const auto changed = (_stories->toggledHidden() != hidden);
+	if (changed
+		&& hidden
+		&& (_storiesExplicitExpand
+			|| _storiesExplicitExpandValue.current() > 0)) {
+		storiesExplicitCollapse();
+	}
 	_stories->setToggledHidden(hiddenInstant, hiddenAnimated);
 	if (changed) {
 		using Type = Ui::ElasticScroll::OverscrollType;
@@ -4208,9 +4224,10 @@ bool Widget::applySearchState(SearchState state) {
 			return false;
 		}
 	} else if ((folder && folder == _openedFolder)
-		|| (community
+		|| (peer
 			&& _openedCommunity
-			&& community == _openedCommunity->channel())) {
+			&& (!community
+				|| community == _openedCommunity->channel()))) {
 		showSearchInTopBar(anim::type::normal);
 	} else if (peer && (_layout != Layout::Main)) {
 		return false;

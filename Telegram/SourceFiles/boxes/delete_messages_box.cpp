@@ -42,26 +42,9 @@ constexpr auto kDeleteMessagesBoxAnimationDuration = crl::time(80);
 
 DeleteMessagesBox::DeleteMessagesBox(
 	QWidget*,
-	not_null<HistoryItem*> item,
-	bool suggestModerateActions)
+	not_null<HistoryItem*> item)
 : _session(&item->history()->session())
 , _ids(1, item->fullId()) {
-	const auto peer = item->history()->peer;
-	const auto channel = peer->asChannel();
-	if (suggestModerateActions) {
-		_moderateBan = item->suggestBanReport();
-		_moderateDeleteAll = item->suggestDeleteAllReport();
-	} else if (item->out()) {
-		const auto chat = peer->asChat();
-		if ((chat && chat->canDeleteMessages()) ||
-			(channel && !channel->isBroadcast() && channel->canDeleteMessages())) {
-			_moderateDeleteAll = true;
-		}
-	}
-	if ((_moderateBan || _moderateDeleteAll) && channel) {
-		_moderateFrom = item->from();
-		_moderateInChannel = channel;
-	}
 }
 
 DeleteMessagesBox::DeleteMessagesBox(
@@ -202,7 +185,9 @@ void DeleteMessagesBox::prepare() {
 			: tr::lng_selected_delete_sure(tr::now, lt_count, _ids.size());
 		if (const auto peer = checkFromSinglePeer()) {
 			auto count = int(_ids.size());
-			if (hasScheduledMessages() || hasSavedMusicMessages()) {
+			if (hasScheduledMessages()
+				|| hasWelcomeTemplateMessages()
+				|| hasSavedMusicMessages()) {
 			} else if (auto revoke = revokeText(peer)) {
 				const auto &settings = Core::App().settings();
 				const auto revokeByDefault
@@ -320,6 +305,17 @@ bool DeleteMessagesBox::hasScheduledMessages() const {
 	return false;
 }
 
+bool DeleteMessagesBox::hasWelcomeTemplateMessages() const {
+	for (const auto &fullId : _ids) {
+		if (const auto item = _session->data().message(fullId)) {
+			if (item->isWelcomeTemplate()) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 bool DeleteMessagesBox::hasSavedMusicMessages() const {
 	for (const auto &fullId : _ids) {
 		if (const auto item = _session->data().message(fullId)) {
@@ -364,10 +360,25 @@ auto DeleteMessagesBox::revokeText(not_null<PeerData*> peer) const
 		return result;
 	}
 
-	const auto items = peer->owner().idsToItems(_ids);
+	auto items = peer->owner().idsToItems(_ids);
 
 	if (items.size() != _ids.size()) {
 		// We don't have information about all messages.
+		return std::nullopt;
+	}
+	items.erase(
+		ranges::remove_if(items, [](not_null<HistoryItem*> item) {
+			return item->isEphemeral();
+		}),
+		end(items));
+	if (items.empty()) {
+		return std::nullopt;
+	}
+
+	items.erase(
+		ranges::remove_if(items, &HistoryItem::isDeleted),
+		end(items));
+	if (items.empty()) {
 		return std::nullopt;
 	}
 

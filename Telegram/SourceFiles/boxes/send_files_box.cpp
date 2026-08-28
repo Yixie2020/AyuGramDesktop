@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/tabbed_panel.h"
 #include "chat_helpers/tabbed_selector.h"
 #include "editor/photo_editor_layer_widget.h"
+#include "editor/video/video_editor_layer.h"
 #include "history/history_drag_area.h"
 #include "history/view/controls/history_view_characters_limit.h"
 #include "history/view/controls/history_view_compose_ai_button.h"
@@ -38,11 +39,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/send_gif_with_caption_box.h"
 #include "boxes/send_credits_box.h"
 #include "boxes/send_files_box_reply_header.h"
+#include "ui/boxes/time_picker_box.h"
 #include "ui/effects/scroll_content_shadow.h"
+#include "ui/text/format_values.h"
 #include "ui/widgets/fields/number_input.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/widgets/menu/menu_multiline_action.h"
 #include "ui/chat/attach/attach_album_preview.h"
 #include "ui/chat/attach/attach_single_file_preview.h"
 #include "ui/chat/attach/attach_single_media_preview.h"
@@ -58,6 +62,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/ephemeral_messages.h"
 #include "data/data_channel.h"
 #include "data/data_document.h"
+#include "data/data_media_types.h"
 #include "data/data_user.h"
 #include "data/data_peer_values.h" // Data::AmPremiumValue.
 #include "data/data_premium_limits.h"
@@ -68,29 +73,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "styles/style_boxes.h"
+#include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
+#include "styles/style_media_player.h"
 #include "styles/style_menu_icons.h"
 
 #include <QtCore/QMimeData>
-
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "base/unixtime.h"
-#include "styles/style_menu_icons.h"
-#include "ayu/utils/telegram_helpers.h"
-#include <QApplication>
-#include <QBuffer>
-#include <QDrag>
-
 
 namespace {
 
 constexpr auto kMaxMessageLength = 4096;
 constexpr auto kMaxDisplayNameLength = 64;
-
-constexpr auto kDragMime = "application/x-tg-sendfile-index";
 
 using Ui::SendFilesWay;
 
@@ -455,6 +450,7 @@ SendFilesBox::Block::Block(
 			_isSingleMedia = true;
 			media->setSendWay(way);
 			media->setCanShowHighQualityBadge(first.canUseHighQualityPhoto());
+			media->setTtlSeconds(first.ttlSeconds);
 			_preview.reset(media);
 		} else {
 			const auto single = Ui::CreateChild<Ui::SingleFilePreview>(
@@ -673,8 +669,7 @@ SendFilesBox::SendFilesBox(
 	const TextWithTags &caption,
 	not_null<PeerData*> toPeer,
 	Api::SendType sendType,
-	SendMenu::Details sendMenuDetails,
-	Fn<void(const TextWithTags &text)> cancelled2)
+	SendMenu::Details sendMenuDetails)
 : SendFilesBox(nullptr, {
 	.show = controller->uiShow(),
 	.list = std::move(list),
@@ -684,7 +679,6 @@ SendFilesBox::SendFilesBox(
 	.check = DefaultCheckForPeer(controller, toPeer),
 	.sendType = sendType,
 	.sendMenuDetails = [=] { return sendMenuDetails; },
-	.cancelled2 = cancelled2,
 }) {
 }
 
@@ -703,7 +697,6 @@ SendFilesBox::SendFilesBox(QWidget*, SendFilesBoxDescriptor &&descriptor)
 , _check(std::move(descriptor.check))
 , _confirmedCallback(std::move(descriptor.confirmed))
 , _cancelledCallback(std::move(descriptor.cancelled))
-, _cancelled2Callback(std::move(descriptor.cancelled2))
 , _caption(
 	this,
 	_st.files.caption,
@@ -777,6 +770,13 @@ Fn<SendMenu::Details()> SendFilesBox::prepareSendMenuDetails(
 	auto initial = descriptor.sendMenuDetails;
 	return crl::guard(this, [=] {
 		auto result = initial ? initial() : SendMenu::Details();
+		if ((result.type == SendMenu::Type::Scheduled
+			|| result.type == SendMenu::Type::ScheduledToUser)
+			&& ranges::any_of(
+				_list.files,
+				&Ui::PreparedFile::ttlSeconds)) {
+			result.type = SendMenu::Type::SilentOnly;
+		}
 		result.spoiler = !hasSpoilerMenu()
 			? SendMenu::SpoilerState::None
 			: allWithSpoilers()
@@ -888,10 +888,6 @@ void SendFilesBox::prepare() {
 	boxClosing() | rpl::on_next([=] {
 		if (!_confirmed && !_textTaken && _cancelledCallback) {
 			_cancelledCallback();
-		}
-		auto text = _caption->getTextWithAppliedMarkdown();
-		if (!_confirmed && _cancelled2Callback && !text.empty()) {
-			_cancelled2Callback(std::move(text));
 		}
 	}, lifetime());
 
@@ -1250,44 +1246,18 @@ void SendFilesBox::addMenuButton() {
 		_menu = base::make_unique_q<Ui::PopupMenu>(top, tabbed.menu);
 		_menu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
 		const auto position = QCursor::pos();
-		SendMenu::FillSendMenu(
+		const auto result = SendMenu::FillSendMenu(
 			_menu.get(),
 			_show,
 			_sendMenuDetails(),
 			_sendMenuCallback,
 			&_st.tabbed.icons,
 			position);
-
-		using ImageInfo = Ui::PreparedFileInformation::Image;
-		if (_list.files.size() == 1 && std::get_if<ImageInfo>(&_list.files[0].information->media)) {
-			_menu->addAction(
-				tr::ayu_SendAsSticker(tr::now),
-				[=]() mutable
-				{
-					const auto file = std::move(_list.files[0]);
-					_list.files.clear();
-
-					const auto sourceImage = std::get_if<ImageInfo>(&file.information->media);
-
-					QByteArray targetArray;
-					QBuffer buffer(&targetArray);
-					buffer.open(QIODevice::WriteOnly);
-					sourceImage->data.save(&buffer, "WEBP");
-
-					QImage targetImage;
-					targetImage.loadFromData(targetArray, "WEBP");
-
-					addFiles(Storage::PrepareMediaFromImage(std::move(targetImage),
-															std::move(targetArray),
-															st::sendMediaPreviewSize));
-					_list.overrideSendImagesAsPhotos = false;
-					initSendWay();
-
-					send({}, false);
-				},
-				&st::menuIconStickers);
+		if (result != SendMenu::FillMenuResult::Prepared) {
+			_menu = nullptr;
+			return true;
 		}
-		_menu->popup(position);
+		_menu->popupPrepared();
 		return true;
 	});
 }
@@ -1421,19 +1391,33 @@ void SendFilesBox::pushBlock(int from, int till) {
 	const auto widget = _inner->add(
 		block.takeWidget(),
 		QMargins(0, _inner->count() ? st::sendMediaRowSkip : 0, 0, 0));
-
-	if ((till - from) == 1 && isFileBlock(from)) {
-		setupDragForBlock(widget, from);
-	}
-
 	struct State {
 		base::unique_qptr<Ui::PopupMenu> menu;
 	};
 	const auto state = widget->lifetime().make_state<State>();
 	const auto openedOnce = widget->lifetime().make_state<bool>(false);
-	const auto openInPhotoEditor = [=, show = _show](int index) {
+	const auto openInEditor = [=, show = _show](int index) {
 		applyBlockChanges();
 
+		auto done = [=](bool ok) {
+			if (ok) {
+				refreshAllAfterChanges(from);
+			}
+		};
+		if (_list.files[index].canEditVideo()) {
+			if (!_sendWay.current().sendImagesAsPhotos()) {
+				return;
+			}
+			Editor::OpenWithPreparedVideoFile(
+				this,
+				show,
+				&_list,
+				index,
+				st::sendMediaPreviewSize,
+				std::move(done),
+				PhotoSideLimit(true));
+			return;
+		}
 		if (!(*openedOnce)) {
 			show->session().settings().incrementPhotoEditorHintShown();
 			show->session().saveSettings();
@@ -1444,11 +1428,7 @@ void SendFilesBox::pushBlock(int from, int till) {
 			show,
 			&_list.files[index],
 			st::sendMediaPreviewSize,
-			[=](bool ok) {
-				if (ok) {
-					refreshAllAfterChanges(from);
-				}
-			},
+			std::move(done),
 			PhotoSideLimit(true));
 	};
 	const auto replaceAttachment = [=, show = _show](int index) {
@@ -1641,12 +1621,17 @@ void SendFilesBox::pushBlock(int from, int till) {
 		state->menu->addAction(tr::lng_attach_replace(tr::now), [=] {
 			replaceAttachment(fileIndex);
 		}, &st::menuIconReplace);
-		const auto canOpenPhotoEditor = true
-			&& _sendWay.current().sendImagesAsPhotos()
+		const auto compressed = _sendWay.current().sendImagesAsPhotos();
+		const auto canOpenPhotoEditor = compressed
 			&& (file.type == Ui::PreparedFile::Type::Photo);
+		const auto canOpenVideoEditor = compressed && file.canEditVideo();
 		if (canOpenPhotoEditor) {
 			state->menu->addAction(tr::lng_context_draw(tr::now), [=] {
-				openInPhotoEditor(fileIndex);
+				openInEditor(fileIndex);
+			}, &st::menuIconDraw);
+		} else if (canOpenVideoEditor) {
+			state->menu->addAction(tr::lng_context_edit_video(tr::now), [=] {
+				openInEditor(fileIndex);
 			}, &st::menuIconDraw);
 		}
 		const auto canEditFileData = !SkipCaption(
@@ -1659,7 +1644,7 @@ void SendFilesBox::pushBlock(int from, int till) {
 			state->menu->addAction(
 				tr::lng_context_upload_edit_caption(tr::now),
 				[=] {
-					auto &file = _list.files[fileIndex];
+					const auto &file = _list.files[fileIndex];
 					const auto count = int(_list.files.size());
 					const auto sync = (fileIndex + 1 == count);
 					_show->show(Box(
@@ -1706,8 +1691,98 @@ void SendFilesBox::pushBlock(int from, int till) {
 				&icons.menuSpoiler,
 				spoilered);
 		}
+		const auto ttlUser = _toPeer->asUser();
+		const auto canSetTtl = !hasPrice()
+			&& (_sendType == Api::SendType::Normal)
+			&& _sendWay.current().sendImagesAsPhotos()
+			&& (file.type == Ui::PreparedFile::Type::Photo
+				|| file.type == Ui::PreparedFile::Type::Video)
+			&& ttlUser
+			&& !ttlUser->isSelf()
+			&& !ttlUser->isBot();
+		if (canSetTtl) {
+			auto submenu = std::make_unique<Ui::PopupMenu>(
+				state->menu.get(),
+				state->menu->st());
+			const auto current = file.ttlSeconds;
+			const auto choose = [=](crl::time ttl) {
+				applyBlockChanges();
+				refreshAllAfterChanges(from, [&] {
+					_list.files[fileIndex].ttlSeconds = ttl;
+				});
+			};
+			const auto add = [&](const QString &label, crl::time value) {
+				submenu->addAction(
+					label,
+					[=] { choose(value); },
+					((current == value)
+						? &st::mediaPlayerMenuCheck
+						: nullptr));
+			};
+			add(tr::lng_ttl_period_once(tr::now), Data::kTimeToLiveSingleView);
+			add(tr::lng_seconds(tr::now, lt_count, 3), 3);
+			add(tr::lng_seconds(tr::now, lt_count, 10), 10);
+			add(tr::lng_seconds(tr::now, lt_count, 30), 30);
+			add(tr::lng_ttl_period_keep(tr::now), 0);
+			const auto custom = (current > 0)
+				&& (current != Data::kTimeToLiveSingleView)
+				&& (current != 3)
+				&& (current != 10)
+				&& (current != 30);
+			const auto chooseCustom = crl::guard(this, [=] {
+				auto values = std::vector<TimeId>();
+				auto phrases = std::vector<QString>();
+				values.reserve(60);
+				phrases.reserve(60);
+				for (auto i = 1; i != 61; ++i) {
+					values.push_back(i);
+					phrases.push_back(tr::lng_seconds(tr::now, lt_count, i));
+				}
+				const auto initial = custom ? int(current) : 10;
+				_show->show(Box([=](not_null<Ui::GenericBox*> box) {
+					box->setTitle(tr::lng_ttl_period_menu());
+					const auto take = Ui::TimePickerBox(
+						box,
+						values,
+						phrases,
+						initial);
+					box->addButton(
+						tr::lng_settings_save(),
+						crl::guard(this, [=] {
+							const auto value = take();
+							box->closeBox();
+							choose(value);
+						}));
+					box->addButton(tr::lng_cancel(), [=] {
+						box->closeBox();
+					});
+				}));
+			});
+			submenu->addAction(
+				(custom
+					? tr::lng_ttl_period_custom_value(
+						tr::now,
+						lt_time,
+						tr::lng_seconds_tiny(tr::now, lt_count, current))
+					: tr::lng_ttl_period_custom(tr::now)),
+				chooseCustom,
+				(custom ? &st::mediaPlayerMenuCheck : nullptr));
+			submenu->addSeparator();
+			submenu->addAction(base::make_unique_q<Ui::Menu::MultilineAction>(
+				submenu->menu(),
+				submenu->st().menu,
+				st::historyHasCustomEmoji,
+				st::historyHasCustomEmojiPosition,
+				TextWithEntities{ tr::lng_ttl_period_hint(tr::now) }));
+			state->menu->addAction(
+				tr::lng_ttl_period_menu(tr::now),
+				std::move(submenu),
+				&st::menuIconTTL);
+		}
 		const auto canEditCover = file.isVideoFile()
-			&& (_toPeer->isBroadcast() || _toPeer->isSelf());
+			&& (_toPeer->isBroadcast()
+				|| _toPeer->isSelf()
+				|| _toPeer->isBot());
 		if (canEditCover) {
 			state->menu->addAction(tr::lng_context_edit_cover(tr::now), [=] {
 				editCover(fileIndex);
@@ -1766,7 +1841,7 @@ void SendFilesBox::pushBlock(int from, int till) {
 
 	block.itemModifyRequest(
 	) | rpl::on_next([=](int index) {
-		openInPhotoEditor(index);
+		openInEditor(index);
 	}, widget->lifetime());
 
 	block.itemRenameRequest(
@@ -1904,7 +1979,7 @@ bool SendFilesBox::checkWith(
 		return true;
 	}
 	const auto compress = way.sendImagesAsPhotos();
-	auto &already = _list.files;
+	const auto &already = _list.files;
 	for (const auto &file : ranges::views::concat(already, added.files)) {
 		if (!_check(file, compress, silent)) {
 			return false;
@@ -2474,11 +2549,11 @@ bool SendFilesBox::validateLength(const QString &text) const {
 void SendFilesBox::send(
 		Api::SendOptions options,
 		bool ctrlShiftEnter) {
-	const auto sumSize = ranges::accumulate(
-		_list.files, int64(0),
-		[](int64 sum, const auto &file) { return sum + file.size; });
-	applyGhostScheduling(&_show->session(), options, getScheduleTime(sumSize));
-
+	if (options.scheduled
+		&& ranges::any_of(_list.files, &Ui::PreparedFile::ttlSeconds)) {
+		showToast(tr::lng_ttl_no_schedule(tr::now));
+		return;
+	}
 	if ((_sendType == Api::SendType::Scheduled
 		|| _sendType == Api::SendType::ScheduledToUser)
 		&& !options.scheduled) {
@@ -2508,7 +2583,14 @@ void SendFilesBox::send(
 		item.sendLargePhotos = way.sendLargePhotos();
 	}
 
-	Storage::ApplyModifications(_list);
+	if ((_limits & SendFilesAllow::OnlyOne)
+		&& (_list.files.size() > 1)
+		&& ranges::any_of(_list.files, [](const auto &file) {
+			return file.hasAnimatedEditScene();
+		})) {
+		showToast(tr::lng_slowmode_no_many(tr::now));
+		return;
+	}
 
 	_confirmed = true;
 	if (_confirmedCallback) {
@@ -2522,6 +2604,7 @@ void SendFilesBox::send(
 				return;
 			}
 		}
+		Storage::ApplyModifications(_list, true);
 		saveSendWaySettings(_wayRemember && _wayRemember->checked());
 		options.invertCaption = _invertCaption;
 		options.price = hasPrice() ? _price.current() : 0;
@@ -2535,12 +2618,21 @@ void SendFilesBox::send(
 				file.caption = {};
 			}
 		}
+		if (!way.sendImagesAsPhotos()) {
+			for (auto &file : _list.files) {
+				file.ttlSeconds = 0;
+			}
+		}
 
 		Assert(_list.filesToProcess.empty());
 
+		auto groupsWay = way;
+		if (ranges::any_of(_list.files, &Ui::PreparedFile::ttlSeconds)) {
+			groupsWay.setGroupFiles(false);
+		}
 		auto groups = DivideByGroups(
 			std::move(_list),
-			way,
+			groupsWay,
 			(_limits & SendFilesAllow::OnlyOne));
 		auto bundle = PrepareFilesBundle(
 			std::move(groups),
@@ -2572,93 +2664,3 @@ Fn<void(Api::SendOptions)> SendFilesBox::sendCallback() {
 }
 
 SendFilesBox::~SendFilesBox() = default;
-
-// AyuGram files reordering
-
-bool SendFilesBox::isFileBlock(int i) const {
-	using Type = Ui::PreparedFile::Type;
-	const auto &f = _list.files[i];
-	return (f.type == Type::File)
-		|| (f.type == Type::Music)
-		|| (f.type == Type::None)
-		|| (f.type == Type::Photo && !_sendWay.current().sendImagesAsPhotos());
-}
-
-void SendFilesBox::moveFile(int from, int to) {
-	if (from < 0 || to < 0
-		|| from >= _list.files.size()
-		|| to >= _list.files.size())
-		return;
-
-	if (from == to) return;
-
-	refreshAllAfterChanges(std::min(from, to), [=] { std::swap(_list.files[from], _list.files[to]); });
-}
-
-void SendFilesBox::setupDragForBlock(not_null<Ui::RpWidget*> w, int index) {
-	w->setAcceptDrops(true);
-
-	const auto pressed = w->lifetime().make_state<rpl::variable<bool>>(false);
-	const auto pressPos = w->lifetime().make_state<rpl::variable<QPoint>>();
-
-	w->events(
-	) | rpl::on_next(
-			[=](not_null<QEvent *> e)
-			{
-				switch (e->type()) {
-					case QEvent::MouseButtonPress: {
-						const auto ev = static_cast<QMouseEvent *>(e.get());
-						if (ev->button() == Qt::LeftButton) {
-							pressed->force_assign(true);
-							pressPos->force_assign(ev->pos());
-						}
-						break;
-					}
-					case QEvent::MouseMove: {
-						if (pressed->current()) {
-							const auto ev = static_cast<QMouseEvent *>(e.get());
-							if ((ev->pos() - pressPos->current()).manhattanLength() >=
-								QApplication::startDragDistance()) {
-								pressed->force_assign(false);
-
-								const auto drag = new QDrag(w);
-								auto mime = std::make_unique<QMimeData>();
-								mime->setData(kDragMime, QByteArray::number(index));
-								drag->setMimeData(mime.release());
-								drag->setPixmap(w->grab());
-								drag->setHotSpot(ev->pos());
-								drag->exec(Qt::MoveAction);
-							}
-						}
-						break;
-					}
-					case QEvent::MouseButtonRelease: pressed->force_assign(false); break;
-
-					case QEvent::DragEnter:
-					case QEvent::DragMove: {
-						const auto ev = static_cast<QDragMoveEvent *>(e.get());
-						if (ev->mimeData()->hasFormat(kDragMime)) {
-							const auto from = ev->mimeData()->data(kDragMime).toInt();
-							if (isFileBlock(from) && isFileBlock(index)) {
-								ev->acceptProposedAction();
-							}
-						}
-						break;
-					}
-					case QEvent::Drop: {
-						const auto ev = static_cast<QDropEvent *>(e.get());
-						if (ev->mimeData()->hasFormat(kDragMime)) {
-							const auto from = ev->mimeData()->data(kDragMime).toInt();
-							if (isFileBlock(from) && isFileBlock(index)) {
-								crl::on_main(this, [=] { moveFile(from, index); });
-								ev->acceptProposedAction();
-							}
-						}
-						break;
-					}
-					default: break;
-				}
-				return base::EventFilterResult::Continue;
-			},
-			w->lifetime());
-}

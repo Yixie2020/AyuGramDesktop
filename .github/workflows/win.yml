@@ -155,3 +155,4 @@ jobs:
         with:
           name: Ayugram_Windows_x64_${{ env.APP_VERSION }}
           path: artifact\
+          retention-days: 1

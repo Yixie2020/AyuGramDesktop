@@ -85,7 +85,7 @@ void AddGifAction(
 			Data::FileOriginSavedGifs(),
 			!saved);
 
-		auto &data = document->owner();
+		const auto &data = document->owner();
 		if (saved) {
 			data.stickers().savedGifsRef().remove(index);
 			document->session().local().writeSavedGifs();
@@ -132,7 +132,11 @@ GifsListWidget::GifsListWidget(
 
 	session().data().stickers().savedGifsUpdated(
 	) | rpl::on_next([=] {
-		refreshSavedGifs();
+		if (underMouse()) {
+			_refreshDelayed = true;
+		} else {
+			refreshSavedGifs();
+		}
 	}, lifetime());
 
 	session().downloaderTaskFinished(
@@ -424,7 +428,7 @@ base::unique_qptr<Ui::PopupMenu> GifsListWidget::fillContextMenu(
 			crl::guard(this, [=] {
 				selectInlineResult(selected, {}, true, true);
 			}),
-			&st::menuIconEdit);
+			&icons->menuGifCaption);
 	}
 
 	if (const auto item = _mosaic.maybeItemAt(_selected)) {
@@ -526,8 +530,7 @@ void GifsListWidget::selectInlineResult(
 			auto from = messageSendingFrom();
 			auto sendGIFCallback = crl::guard(
 				this,
-				[=]
-				{
+				[=] {
 					_fileChosen.fire({
 						.document = document,
 						.options = options,
@@ -537,7 +540,7 @@ void GifsListWidget::selectInlineResult(
 				});
 
 			const auto &settings = AyuSettings::getInstance();
-			if (settings.gifConfirmation()) {
+			if (settings.gifConfirmation() && !needsCaption) {
 				_show->showBox(Ui::MakeConfirmBox({
 					.text = tr::ayu_ConfirmationGIF(),
 					.confirmed = sendGIFCallback,
@@ -575,10 +578,16 @@ void GifsListWidget::mouseMoveEvent(QMouseEvent *e) {
 
 void GifsListWidget::leaveEventHook(QEvent *e) {
 	clearSelection();
+	if (base::take(_refreshDelayed)) {
+		refreshSavedGifs();
+	}
 }
 
 void GifsListWidget::leaveToChildEvent(QEvent *e, QWidget *child) {
 	clearSelection();
+	if (base::take(_refreshDelayed)) {
+		refreshSavedGifs();
+	}
 }
 
 void GifsListWidget::enterFromChildEvent(QEvent *e, QWidget *child) {
@@ -626,6 +635,7 @@ void GifsListWidget::clearHeavyData() {
 }
 
 void GifsListWidget::refreshSavedGifs() {
+	_refreshDelayed = false;
 	if (_section == Section::Gifs) {
 		clearInlineRows(false);
 

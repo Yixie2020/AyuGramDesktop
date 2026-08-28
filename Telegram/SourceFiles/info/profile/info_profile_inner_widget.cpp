@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_memento.h"
 #include "info/info_wrap_widget.h"
 #include "info/profile/info_profile_widget.h"
+#include "info/profile/tabs/adapters/info_profile_tab_chats.h"
 #include "info/profile/tabs/adapters/info_profile_tab_media.h"
 #include "info/profile/tabs/adapters/info_profile_tab_members.h"
 #include "info/profile/tabs/adapters/info_profile_tab_peer_lists.h"
@@ -88,44 +89,13 @@ void AddSavedMusic(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			layout,
 			object_ptr<Ui::VerticalLayout>(layout)));
-	Info::Saved::SetupSavedMusic(
-		wrap->entity(),
-		controller,
-		peer,
-		std::move(topBarColor));
-	using namespace rpl::mappers;
 	wrap->toggleOn(
-		wrap->entity()->heightValue() | rpl::map(_1 > 0),
+		Info::Saved::SetupSavedMusic(
+			wrap->entity(),
+			controller,
+			peer,
+			std::move(topBarColor)),
 		anim::type::instant);
-}
-
-void AddAboutVerification(
-		not_null<Ui::VerticalLayout*> layout,
-		not_null<PeerData*> peer) {
-	const auto inner = layout->add(object_ptr<Ui::VerticalLayout>(layout));
-	peer->session().changes().peerFlagsValue(
-		peer,
-		Data::PeerUpdate::Flag::VerifyInfo
-	) | rpl::on_next([=] {
-		const auto info = peer->botVerifyDetails();
-		while (inner->count()) {
-			delete inner->widgetAt(0);
-		}
-		if (!info) {
-			Ui::AddDivider(inner);
-		} else {
-			auto hasMainApp = false;
-			if (const auto user = peer->asUser()) {
-				if (user->botInfo) {
-					hasMainApp = user->botInfo->hasMainApp;
-				}
-			}
-			if (!hasMainApp && !info->description.empty()) {
-				Ui::AddDividerText(inner, rpl::single(info->description));
-			}
-		}
-		inner->resizeToWidth(inner->width());
-	}, inner->lifetime());
 }
 
 void AddUnofficialSecurityRiskWarning(
@@ -209,6 +179,7 @@ InnerWidget::InnerWidget(
 , _migrated(_controller->migrated())
 , _topic(_controller->key().topic())
 , _sublist(_controller->key().sublist())
+, _savedMessages(_controller->key().savedMessages() != nullptr)
 , _content(setupContent(this, origin)) {
 	_content->heightValue(
 	) | rpl::on_next([this](int height) {
@@ -231,7 +202,7 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 			user,
 			Data::PeerUpdate::Flag::FullInfo
 		) | rpl::on_next([=] {
-			auto &photos = user->session().api().peerPhoto();
+			const auto &photos = user->session().api().peerPhoto();
 			if (const auto original = photos.nonPersonalPhoto(user)) {
 				// Preload it for the edit contact box.
 				_nonPersonalView = original->createMediaView();
@@ -243,18 +214,19 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 
 	auto result = object_ptr<Ui::VerticalLayout>(parent);
 
-	const auto musicPeer = _sublist
-		? _sublist->sublistPeer().get()
-		: _peer.get();
-	AddSavedMusic(
-		result.data(),
-		_controller,
-		musicPeer,
-		_topBarColor.value());
-	if (const auto user = _peer->asUser()) {
-		AddUnofficialSecurityRiskWarning(result.data(), user);
+	if (!_savedMessages) {
+		const auto musicPeer = _sublist
+			? _sublist->sublistPeer().get()
+			: _peer.get();
+		AddSavedMusic(
+			result.data(),
+			_controller,
+			musicPeer,
+			_topBarColor.value());
+		if (const auto user = _peer->asUser()) {
+			AddUnofficialSecurityRiskWarning(result.data(), user);
+		}
 	}
-	AddAboutVerification(result.data(), _peer);
 
 	auto stack = SectionStack(result.data());
 	if (_topic && _topic->creating()) {
@@ -262,13 +234,15 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 		return result;
 	}
 
-	BuildProfileDetailsSections(
-		stack,
-		_controller,
-		_peer,
-		_topic,
-		_sublist,
-		origin);
+	if (!_savedMessages) {
+		BuildProfileDetailsSections(
+			stack,
+			_controller,
+			_peer,
+			_topic,
+			_sublist,
+			origin);
+	}
 
 	const auto thirdColumn = (_controller->wrap() == Wrap::Side);
 	const auto tabs = UseProfileMediaTabs() && !thirdColumn;
@@ -336,7 +310,10 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 			addSplit(Type::Photo);
 			addSplit(Type::Video);
 		};
-		if (!_topic) {
+		if (_savedMessages) {
+			tabs.push_back(MakeChatsTabDescriptor());
+		}
+		if (!_topic && !_savedMessages) {
 			tabs.push_back(MakeStoriesTabDescriptor(tabsPeer));
 			if (!_sublist) {
 				tabs.push_back(MakeGiftsTabDescriptor(_peer));
@@ -351,7 +328,7 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 				MembersInTabValue(_peer)));
 		}
 		addMediaTabs();
-		if (!_topic) {
+		if (!_topic && !_savedMessages) {
 			tabs.push_back(MakeSavedTabDescriptor(tabsPeer));
 		}
 		addTab(Storage::SharedMediaType::File);
@@ -365,11 +342,12 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 			Storage::SharedMediaType::Poll) | rpl::map(_1 > 0)));
 		addTab(Storage::SharedMediaType::RoundVoiceFile);
 		addTab(Storage::SharedMediaType::GIF);
-		if (!_topic && !_sublist) {
+		if (!_topic && !_sublist && !_savedMessages) {
 			if (const auto user = _peer->asUser()) {
 				tabs.push_back(MakeCommonGroupsTabDescriptor(user));
 			}
-			if ((_peer->asBot() || _peer->asBroadcast()) && !AyuSettings::getInstance().hideSimilarChannels()) {
+			if ((_peer->asBot() || _peer->asBroadcast())
+				&& !AyuSettings::getInstance().hideSimilarChannels()) {
 				tabs.push_back(MakeSimilarPeersTabDescriptor(_peer));
 			}
 		}
@@ -404,9 +382,14 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 			.shown = raw->heightValue() | rpl::map(_1 > 0),
 		});
 	};
-	if (_topic || _sublist) {
+	if (_topic || _sublist || _savedMessages) {
 		if (tabs) {
 			addTabsHost();
+			if (_savedMessages) {
+				// The bar is pinned at its minimum height there, so the
+				// tabs behave as docked from the very start.
+				_tabsDocked = true;
+			}
 		}
 		stack.finalize();
 		return result;
@@ -517,7 +500,8 @@ void InnerWidget::visibleTopBottomUpdated(
 			}
 		}
 		_tabsHost->setVisibleRegion(visibleTop - top, visibleBottom - top);
-		_tabsDocked = (top > 0) && (visibleTop >= top);
+		_tabsDocked = _savedMessages
+			|| ((top > 0) && (visibleTop >= top));
 	}
 }
 
@@ -604,6 +588,9 @@ base::weak_qptr<Ui::RpWidget> InnerWidget::createPinnedToTop(
 			.peer = _sublist ? _sublist->sublistPeer().get() : nullptr,
 			.backToggles = _backToggles.value(),
 			.showFinished = _showFinished.events(),
+			.customStatus = (_savedMessages
+				? SavedChatsCountStatus(&_peer->session())
+				: rpl::producer<TextWithEntities>()),
 		});
 	content->backRequest(
 	) | rpl::start_to_stream(_backClicks, content->lifetime());

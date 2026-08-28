@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_window_title.h"
 #include "history/history.h"
 #include "info/media/info_media_widget.h" // SharedMediaTitle.
+#include "window/window_saved_windows.h"
 #include "window/window_separate_id.h"
 #include "window/window_session_controller.h"
 #include "window/window_lock_widgets.h"
@@ -67,6 +68,13 @@ constexpr auto kSaveWindowPositionTimeout = crl::time(1000);
 
 using Core::WindowPosition;
 
+[[nodiscard]] QRect ScreenAvailableGeometry(not_null<const QWidget*> widget) {
+	// When the last monitor is removed Qt keeps delivering resize events
+	// while QGuiApplication has no screens at all, so screen() is nullptr.
+	const auto screen = widget->screen();
+	return screen ? screen->availableGeometry() : QRect();
+}
+
 [[nodiscard]] QPoint ChildSkip() {
 	const auto skipx = st::defaultDialogRow.padding.left()
 		+ st::defaultDialogRow.photoSize
@@ -89,9 +97,9 @@ base::options::toggle OptionNewWindowsSizeAsFirst({
 base::options::toggle OptionDisableTouchbar({
 	.id = kOptionDisableTouchbar,
 	.name = "Disable Touch Bar (macOS only).",
-#if defined Q_OS_MAC && defined Q_PROCESSOR_ARM
-	.defaultValue = true,
-#endif // Q_OS_MAC && Q_PROCESSOR_ARM
+#ifdef Q_OS_MAC
+	.defaultValue = !Platform::HasTouchBar(),
+#endif // Q_OS_MAC
 	.scope = [] {
 #ifdef Q_OS_MAC
 		return true;
@@ -193,10 +201,6 @@ void OverrideApplicationIcon(QImage image) {
 	OverridenIcon() = std::move(image);
 }
 
-QIcon CreateOfficialIcon(Main::Session *session) {
-	return QIcon(Ui::PixmapFromImage(AyuAssets::currentAppLogo()));
-}
-
 QIcon CreateSupportIcon(Main::Session *session) {
 	const auto support = (session && session->supportMode());
 	if (!support) {
@@ -212,11 +216,15 @@ QIcon CreateSupportIcon(Main::Session *session) {
 
 QIcon CreateIcon(Main::Session *session, bool returnNullIfDefault) {
 	const auto supportIcon = CreateSupportIcon(session);
-	if (!supportIcon.isNull() || returnNullIfDefault) {
+	if (!supportIcon.isNull()) {
 		return supportIcon;
 	}
 
-	const auto officialIcon = CreateOfficialIcon(session);
+	const auto officialIcon = QIcon(
+		Ui::PixmapFromImage(base::duplicate(Logo())));
+	if (!officialIcon.isNull() || returnNullIfDefault) {
+		return officialIcon;
+	}
 
 	if constexpr (!Platform::IsLinux()) {
 		return officialIcon;
@@ -544,8 +552,11 @@ bool MainWindow::computeIsActive() const {
 QRect MainWindow::desktopRect() const {
 	const auto now = crl::now();
 	if (!_monitorLastGot || now >= _monitorLastGot + crl::time(1000)) {
-		_monitorLastGot = now;
-		_monitorRect = computeDesktopRect();
+		const auto rect = computeDesktopRect();
+		if (!rect.isEmpty()) {
+			_monitorLastGot = now;
+			_monitorRect = rect;
+		}
 	}
 	return _monitorRect;
 }
@@ -695,6 +706,11 @@ void MainWindow::recountGeometryConstraints() {
 }
 
 WindowPosition MainWindow::initialPosition() const {
+	if (const auto saved = Core::App().savedWindows()) {
+		if (const auto restored = saved->restorePositionFor(id())) {
+			return Core::AdjustToScale(*restored, u"Window"_q);
+		}
+	}
 	const auto active = Core::App().activeWindow();
 	return (!active || active == &controller())
 		? Core::AdjustToScale(
@@ -889,7 +905,7 @@ void MainWindow::updateTitle() {
 }
 
 QRect MainWindow::computeDesktopRect() const {
-	return screen()->availableGeometry();
+	return ScreenAvailableGeometry(this);
 }
 
 void MainWindow::savePosition(Qt::WindowState state) {
@@ -899,8 +915,13 @@ void MainWindow::savePosition(Qt::WindowState state) {
 
 	if (state == Qt::WindowMinimized
 		|| !isVisible()
-		|| !Core::App().savingPositionFor(&controller())
 		|| !positionInited()) {
+		return;
+	}
+	if (const auto saved = Core::App().savedWindows()) {
+		saved->scheduleSave();
+	}
+	if (!Core::App().savingPositionFor(&controller())) {
 		return;
 	}
 
@@ -953,6 +974,53 @@ WindowPosition MainWindow::withScreenInPosition(
 		u"Window"_q);
 }
 
+WindowPosition MainWindow::countPositionForSave() {
+	auto result = WindowPosition{ .scale = cScale() };
+	const auto handle = windowHandle();
+	const auto state = handle ? handle->windowState() : Qt::WindowNoState;
+	const auto windowScreen = screen();
+	const auto screenGeometry = windowScreen
+		? windowScreen->geometry()
+		: QRect();
+	if (windowScreen) {
+		result.moncrc = Platform::ScreenNameChecksum(windowScreen->name());
+	}
+	if (state == Qt::WindowMaximized || state == Qt::WindowFullScreen) {
+		result.maximized = 1;
+		const auto normal = normalGeometry();
+		result.x = normal.x() - screenGeometry.x();
+		result.y = normal.y() - screenGeometry.y();
+		result.w = normal.width();
+		result.h = normal.height();
+		return result;
+	}
+	const auto rect = body()->mapToGlobal(body()->rect());
+	result.x = rect.x();
+	result.y = rect.y();
+	result.w = rect.width() - (_rightColumn ? _rightColumn->width() : 0);
+	result.h = rect.height();
+	result = withScreenInPosition(result);
+	result.x -= screenGeometry.x();
+	result.y -= screenGeometry.y();
+	return result;
+}
+
+void MainWindow::applySavedPosition(const Core::WindowPosition &position) {
+	const auto geometry = countInitialGeometry(
+		Core::AdjustToScale(position, u"Window"_q));
+	const auto handle = windowHandle();
+	const auto state = handle ? handle->windowState() : Qt::WindowNoState;
+	if (position.maximized) {
+		setGeometry(geometry);
+		setWindowState(Qt::WindowMaximized);
+	} else {
+		if (state == Qt::WindowMaximized || state == Qt::WindowFullScreen) {
+			setWindowState(Qt::WindowNoState);
+		}
+		setGeometry(geometry);
+	}
+}
+
 bool MainWindow::minimizeToTray() {
 	if (Core::Quitting() || !Core::App().tray().has()) {
 		return false;
@@ -993,12 +1061,15 @@ void MainWindow::showRightColumn(object_ptr<Ui::RpWidget> widget) {
 }
 
 int MainWindow::maximalExtendBy() const {
-	auto desktop = screen()->availableGeometry();
+	const auto desktop = ScreenAvailableGeometry(this);
 	return std::max(desktop.width() - body()->width(), 0);
 }
 
 bool MainWindow::canExtendNoMove(int extendBy) const {
-	auto desktop = screen()->availableGeometry();
+	const auto desktop = ScreenAvailableGeometry(this);
+	if (desktop.isEmpty()) {
+		return false;
+	}
 	auto inner = body()->mapToGlobal(body()->rect());
 	auto innerRight = (inner.x() + inner.width() + extendBy);
 	auto desktopRight = (desktop.x() + desktop.width());
@@ -1006,7 +1077,11 @@ bool MainWindow::canExtendNoMove(int extendBy) const {
 }
 
 int MainWindow::tryToExtendWidthBy(int addToWidth) {
-	auto desktop = screen()->availableGeometry();
+	const auto desktop = ScreenAvailableGeometry(this);
+	if (desktop.isEmpty()) {
+		updateControlsGeometry();
+		return 0;
+	}
 	auto inner = body()->mapToGlobal(body()->rect());
 	accumulate_min(
 		addToWidth,

@@ -57,6 +57,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
 
+// AyuGram includes
+#include "styles/style_ayu_icons.h"
+
+
 namespace {
 
 constexpr auto kSortByOnlineThrottle = 3 * crl::time(1000);
@@ -274,7 +278,7 @@ void PeerListGlobalSearchController::searchDone(
 		mtpRequestId requestId) {
 	Expects(result.type() == mtpc_contacts_found);
 
-	auto &contacts = result.c_contacts_found();
+	const auto &contacts = result.c_contacts_found();
 	auto query = _query;
 	if (requestId) {
 		_session->data().processUsers(contacts.vusers());

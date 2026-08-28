@@ -9,7 +9,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_text_entities.h"
 #include "data/business/data_shortcut_messages.h"
+#include "data/components/ephemeral_messages.h"
 #include "data/components/scheduled_messages.h"
+#include "data/components/welcome_messages.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -35,6 +37,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_worker.h"
+#include "ayu/data/messages_storage.h"
 #include "ayu/utils/telegram_helpers.h"
 
 
@@ -991,9 +994,22 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 					_owner->shortcutMessages().removeSending(item);
 				}
 				continue;
+			} else if (item->isWelcomeTemplate()) {
+				auto &welcome = _owner->session().welcomeMessages();
+				if (item->isSending() || item->hasFailed()) {
+					welcome.removeSending(item);
+				} else {
+					welcome.deleteTemplate(item);
+				}
+				continue;
+			} else if (item->isEphemeral()) {
+				_owner->session().ephemeralMessages().deleteMessage(item);
+				continue;
 			}
 			remove.push_back(item);
-			if (item->isRegular()) {
+			if (item->isDeleted()) {
+				AyuMessages::removeDeletedMessage(item);
+			} else if (item->isRegular()) {
 				idsByPeer[history].push_back(MTP_int(itemId.msg));
 			}
 		}

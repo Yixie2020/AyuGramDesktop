@@ -37,12 +37,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "styles/style_dialogs.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/filters/filters_controller.h"
-#include "ayu/ui/ayu_userpic.h"
-
-
 namespace Dialogs {
 namespace {
 
@@ -52,59 +46,122 @@ constexpr auto kBottomLayer = 1;
 constexpr auto kNoneLayer = 0;
 constexpr auto kBlurRadius = 24;
 
-[[nodiscard]] const QPainterPath &SubscriptionOutlinePath() {
-	static auto path = QPainterPath();
-	if (!path.isEmpty()) {
-		return path;
+[[nodiscard]] int SubscriptionCutSkip() {
+	const auto width = st::dialogsSubscriptionBadgeOutlineTwice / 2.;
+	return int(std::ceil(width)) + 1;
+}
+
+// Exact squared euclidean distance transform, two separable passes.
+[[nodiscard]] std::vector<float64> SquaredDistances(
+		std::vector<float64> grid,
+		int side) {
+	constexpr auto kFar = 1e12;
+	auto values = std::vector<float64>(side);
+	auto hulls = std::vector<int>(side);
+	auto breaks = std::vector<float64>(side + 1);
+	const auto pass = [&](auto read, auto write) {
+		for (auto i = 0; i != side; ++i) {
+			values[i] = read(i);
+		}
+		auto last = 0;
+		hulls[0] = 0;
+		breaks[0] = -kFar;
+		breaks[1] = kFar;
+		for (auto i = 1; i != side; ++i) {
+			auto cross = 0.;
+			while (true) {
+				const auto hull = hulls[last];
+				cross = ((values[i] + float64(i) * i)
+					- (values[hull] + float64(hull) * hull))
+					/ (2. * i - 2. * hull);
+				if (last > 0 && cross <= breaks[last]) {
+					--last;
+					continue;
+				}
+				break;
+			}
+			++last;
+			hulls[last] = i;
+			breaks[last] = cross;
+			breaks[last + 1] = kFar;
+		}
+		last = 0;
+		for (auto i = 0; i != side; ++i) {
+			while (breaks[last + 1] < i) {
+				++last;
+			}
+			const auto hull = hulls[last];
+			write(i, float64(i - hull) * (i - hull) + values[hull]);
+		}
+	};
+	for (auto x = 0; x != side; ++x) {
+		pass(
+			[&](int y) { return grid[y * side + x]; },
+			[&](int y, float64 value) { grid[y * side + x] = value; });
 	}
-	const auto scaledMoveTo = [&](float64 x, float64 y) {
-		path.moveTo(style::ConvertFloatScale(x), style::ConvertFloatScale(y));
-	};
-	const auto scaledLineTo = [&](float64 x, float64 y) {
-		path.lineTo(style::ConvertFloatScale(x), style::ConvertFloatScale(y));
-	};
-	const auto scaledCubicTo = [&](
-			float64 x1,
-			float64 y1,
-			float64 x2,
-			float64 y2,
-			float64 x3,
-			float64 y3) {
-		path.cubicTo(
-			style::ConvertFloatScale(x1),
-			style::ConvertFloatScale(y1),
-			style::ConvertFloatScale(x2),
-			style::ConvertFloatScale(y2),
-			style::ConvertFloatScale(x3),
-			style::ConvertFloatScale(y3));
-	};
-	const auto scaledTranslate = [&](float64 x, float64 y) {
-		path.translate(
-			style::ConvertFloatScale(x),
-			style::ConvertFloatScale(y));
-	};
+	for (auto y = 0; y != side; ++y) {
+		pass(
+			[&](int x) { return grid[y * side + x]; },
+			[&](int x, float64 value) { grid[y * side + x] = value; });
+	}
+	return grid;
+}
 
-	scaledMoveTo(42.3009, 18.3345);
-	scaledLineTo(44.3285, 14.1203);
-	scaledCubicTo(44.6152, 13.6549, 45.7858, 13.3542, 46.1909, 13.5523);
-	scaledCubicTo(46.3355, 13.6044, 47.0064, 13.7541, 47.3833, 14.5053);
-	scaledLineTo(49.3924 * 1.0071, 18.4206 * 0.9905);
-	// 49.5459 * 1.007, 18.7336 * 0.9897.
-	scaledCubicTo(49.8927213, 18.5406439, 52.5473, 18.8491, 53.3141, 18.8789);
-	scaledCubicTo(53.6484, 18.8441, 55.8914, 20.0065, 54.3752, 20.7818);
-	scaledCubicTo(54.1725, 20.8744, 41.3467, 31.3217, 41.3467, 31.3217);
-	scaledCubicTo(40.7918, 31.5944, 41.2661, 31.4116, 40.8968, 30.9483);
-	scaledCubicTo(39.9809, 30.3111, 40.0577, 25.4542, 40.1925, 25.5408);
-	scaledCubicTo(39.9835, 25.6454, 38.4545, 22.9776, 37.8121, 22.3477);
-	scaledLineTo(37.3236, 21.4448);
-	scaledCubicTo(37.0943, 20.8845, 37.2524, 20.4742, 37.4164, 19.7765);
-	scaledCubicTo(37.4703, 19.4582, 38.1756, 19.0759, 38.4504, 19.0422);
-	scaledLineTo(41.6566, 18.6449);
-	scaledCubicTo(41.5344, 18.6041, 42.2622, 18.6087, 42.3009, 18.3345);
-	scaledTranslate(-42.3009, -18.3345);
-	scaledTranslate(1.2, 0.4);
+// Star silhouette grown by outline width in every direction.
+[[nodiscard]] const QImage &SubscriptionCutMask() {
+	constexpr auto kSupersample = 4;
 
-	return path;
+	static auto mask = QImage();
+	if (!mask.isNull()) {
+		return mask;
+	}
+	const auto ratio = style::DevicePixelRatio();
+	const auto skip = SubscriptionCutSkip();
+	const auto size = st::dialogsSubscriptionBadgeSize + 2 * skip;
+	const auto star = Ui::GenerateStars(
+		st::dialogsSubscriptionBadgeSize,
+		1,
+		ratio * kSupersample);
+	const auto side = size * ratio * kSupersample;
+	const auto offset = skip * ratio * kSupersample;
+	constexpr auto kFar = 1e12;
+	auto grid = std::vector<float64>(side * side, kFar);
+	for (auto y = 0; y != star.height(); ++y) {
+		const auto line = reinterpret_cast<const QRgb*>(
+			star.constScanLine(y));
+		for (auto x = 0; x != star.width(); ++x) {
+			if (qAlpha(line[x]) > 127) {
+				grid[(y + offset) * side + (x + offset)] = 0.;
+			}
+		}
+	}
+	const auto squared = SquaredDistances(std::move(grid), side);
+	const auto radius = (st::dialogsSubscriptionBadgeOutlineTwice / 2.)
+		* ratio
+		* kSupersample;
+	const auto result = size * ratio;
+	mask = QImage(result, result, QImage::Format_ARGB32_Premultiplied);
+	mask.setDevicePixelRatio(ratio);
+	for (auto y = 0; y != result; ++y) {
+		const auto line = reinterpret_cast<QRgb*>(mask.scanLine(y));
+		for (auto x = 0; x != result; ++x) {
+			auto covered = 0.;
+			for (auto inner = 0; inner != kSupersample; ++inner) {
+				const auto row = (y * kSupersample + inner) * side
+					+ x * kSupersample;
+				for (auto i = 0; i != kSupersample; ++i) {
+					covered += std::clamp(
+						radius + 0.5 - std::sqrt(squared[row + i]),
+						0.,
+						1.);
+				}
+			}
+			const auto alpha = base::SafeRound(
+				255. * covered / (kSupersample * kSupersample));
+			line[x] = qRgba(0, 0, 0, int(alpha));
+		}
+	}
+	return mask;
 }
 
 [[nodiscard]] const QImage &SubscriptionIcon() {
@@ -119,52 +176,11 @@ constexpr auto kBlurRadius = 24;
 [[nodiscard]] QImage CornerBadgeTTL(
 		not_null<PeerData*> peer,
 		Ui::PeerUserpicView &view,
-		int photoSize,
-		QColor background) {
+		int photoSize) {
 	const auto ttl = peer->messagesTTL();
 	if (!ttl) {
 		return QImage();
 	}
-	const auto ratio = style::DevicePixelRatio();
-	const auto fullSize = photoSize;
-	const auto partRect = CornerBadgeTTLRect(fullSize);
-	const auto &partSize = partRect.width();
-	auto source = PeerData::GenerateUserpicImage(peer, view, fullSize * ratio);
-	if (source.hasAlphaChannel()) {
-		auto flattened = QImage(
-			source.size(),
-			QImage::Format_ARGB32_Premultiplied);
-		flattened.setDevicePixelRatio(source.devicePixelRatio());
-		flattened.fill(background);
-		{
-			auto painter = QPainter(&flattened);
-			painter.drawImage(0, 0, source);
-		}
-		source = std::move(flattened);
-	}
-	auto result = Images::Circle(BlurredDarkenedPart(
-		std::move(source),
-		QRect(
-			partRect.topLeft() * ratio,
-			QSize(partSize, partSize) * ratio)));
-	result.setDevicePixelRatio(ratio);
-
-	auto q = QPainter(&result);
-	PainterHighQualityEnabler hq(q);
-
-	const auto innerRect = QRect(QPoint(), partRect.size())
-		- st::dialogsTTLBadgeInnerMargins;
-	const auto ttlText = Ui::FormatTTLTiny(ttl);
-
-	Ui::PaintTimerIcon(q, innerRect, ttlText, st::premiumButtonFg->c);
-
-	return result;
-}
-
-[[nodiscard]] QImage CornerBadgeHidden(
-		not_null<PeerData*> peer,
-		Ui::PeerUserpicView &view,
-		int photoSize) {
 	const auto ratio = style::DevicePixelRatio();
 	const auto fullSize = photoSize;
 	const auto partRect = CornerBadgeTTLRect(fullSize);
@@ -182,7 +198,49 @@ constexpr auto kBlurRadius = 24;
 
 	const auto innerRect = QRect(QPoint(), partRect.size())
 		- st::dialogsTTLBadgeInnerMargins;
-	st::dialogsCommunityHiddenBadgeIcon.paintInCenter(q, innerRect);
+	const auto ttlText = Ui::FormatTTLTiny(ttl);
+
+	Ui::PaintTimerIcon(q, innerRect, ttlText, st::premiumButtonFg->c);
+
+	return result;
+}
+
+[[nodiscard]] QRect CornerBadgeHiddenRect(int photoSize) {
+	const auto iconSize = st::dialogsCommunityHiddenBadgeIcon.size();
+	const auto padding = st::dialogsCommunityHiddenBadgePadding;
+	const auto margins = QMargins(padding, padding, padding, padding);
+	const auto badgeSize = iconSize.grownBy(margins);
+	return QRect(
+		QPoint(
+			photoSize - badgeSize.width()
+				+ st::dialogsTTLBadgeSkip.x(),
+			photoSize - badgeSize.height()
+				+ st::dialogsTTLBadgeSkip.y()),
+		badgeSize);
+}
+
+[[nodiscard]] QImage CornerBadgeHidden(
+		not_null<PeerData*> peer,
+		Ui::PeerUserpicView &view,
+		int photoSize) {
+	const auto ratio = style::DevicePixelRatio();
+	const auto fullSize = photoSize;
+	const auto partSize = CornerBadgeHiddenRect(fullSize).size();
+	auto result = Images::Circle(BlurredDarkenedPart(
+		PeerData::GenerateUserpicImage(peer, view, fullSize * ratio, 0),
+		QRect(
+			QPoint(
+				fullSize - partSize.width(),
+				fullSize - partSize.height()) * ratio,
+			partSize * ratio)));
+	result.setDevicePixelRatio(ratio);
+
+	auto q = QPainter(&result);
+	PainterHighQualityEnabler hq(q);
+
+	st::dialogsCommunityHiddenBadgeIcon.paintInCenter(
+		q,
+		QRect(QPoint(), partSize));
 
 	return result;
 }
@@ -190,7 +248,12 @@ constexpr auto kBlurRadius = 24;
 } // namespace
 
 QRect CornerBadgeTTLRect(int photoSize) {
-	return AyuUserpic::OnlineBadgeRect(photoSize, st::dialogsTTLBadgeSize);
+	const auto &partSize = st::dialogsTTLBadgeSize;
+	return QRect(
+		photoSize - partSize + st::dialogsTTLBadgeSkip.x(),
+		photoSize - partSize + st::dialogsTTLBadgeSkip.y(),
+		partSize,
+		partSize);
 }
 
 QImage BlurredDarkenedPart(QImage image, QRect part) {
@@ -507,11 +570,8 @@ void Row::PaintCornerBadgeFrame(
 			}
 		}
 		if (peer && (peer->forum() || peer->monoforum())) {
-			const auto &settings = AyuSettings::getInstance();
-			const auto singleRadius = settings.singleCornerRadius();
-			const auto radius = singleRadius
-				? AyuUserpic::ComputeRadiusF(context.st->photoSize)
-				: (context.st->photoSize * Ui::ForumUserpicRadiusMultiplier());
+			const auto radius = context.st->photoSize
+				* Ui::ForumUserpicRadiusMultiplier();
 			Ui::PaintOutlineSegments(q, outline, radius, segments);
 		} else {
 			Ui::PaintOutlineSegments(q, outline, segments);
@@ -523,19 +583,14 @@ void Row::PaintCornerBadgeFrame(
 	}
 
 	if (subscribed) {
-		if (!hq) {
-			hq.emplace(q);
-		}
-		// TODO: Unnecessarily repaints on activating peer.
-		q.setCompositionMode(QPainter::CompositionMode_Source);
 		const auto &s = st::dialogsSubscriptionBadgeSkip;
-		auto path = SubscriptionOutlinePath();
 		const auto x = photoSize - s.x() - st::dialogsSubscriptionBadgeSize;
 		const auto y = photoSize - s.y() - st::dialogsSubscriptionBadgeSize;
-		q.translate(x, y);
-		q.fillPath(path, Qt::transparent);
-		q.setCompositionMode(QPainter::CompositionMode_SourceOver);
+		const auto skip = SubscriptionCutSkip();
 		q.resetTransform();
+		q.setCompositionMode(QPainter::CompositionMode_DestinationOut);
+		q.drawImage(x - skip, y - skip, SubscriptionCutMask());
+		q.setCompositionMode(QPainter::CompositionMode_SourceOver);
 		q.drawImage(x, y, SubscriptionIcon());
 		return;
 	}
@@ -579,11 +634,7 @@ void Row::PaintCornerBadgeFrame(
 	if (const auto p = manager.progressForLayer(kBottomLayer); p > 0.) {
 		const auto size = photoSize;
 		if (data->cacheTTL.isNull() && peer && peer->messagesTTL()) {
-			data->cacheTTL = CornerBadgeTTL(
-				peer,
-				view,
-				size,
-				(context.active ? st::dialogsBgActive : st::dialogsBg)->c);
+			data->cacheTTL = CornerBadgeTTL(peer, view, size);
 		}
 		q.setOpacity(p);
 		const auto point = CornerBadgeTTLRect(size).topLeft();
@@ -591,11 +642,11 @@ void Row::PaintCornerBadgeFrame(
 		q.setOpacity(1.);
 	}
 	if (const auto p = manager.progressForLayer(kHiddenLayer); p > 0.) {
+		const auto rect = CornerBadgeHiddenRect(photoSize);
 		if (data->cacheHidden.isNull() && peer && hidden) {
 			data->cacheHidden = CornerBadgeHidden(peer, view, photoSize);
 		}
 		if (!data->cacheHidden.isNull()) {
-			const auto rect = CornerBadgeTTLRect(photoSize);
 			q.setOpacity(p);
 			q.drawImage(rect.topLeft(), data->cacheHidden);
 			q.setOpacity(1.);
@@ -626,6 +677,9 @@ void Row::PaintCornerBadgeFrame(
 		? st::dialogsOnlineBadgeSize
 		: st::dialogsCallBadgeSize;
 	const auto stroke = st::dialogsOnlineBadgeStroke;
+	const auto skip = online
+		? st::dialogsOnlineBadgeSkip
+		: st::dialogsCallBadgeSkip;
 	const auto shrink = (size / 2) * (1. - topLayerProgress);
 
 	auto pen = QPen(Qt::transparent);
@@ -634,13 +688,12 @@ void Row::PaintCornerBadgeFrame(
 	q.setBrush(data->active
 		? st::dialogsOnlineBadgeFgActive
 		: st::dialogsOnlineBadgeFg);
-	const auto badge = AyuUserpic::OnlineBadgeRect(photoSize, size, stroke);
-	q.drawEllipse(QRectF(badge).marginsRemoved({
-		shrink,
-		shrink,
-		shrink,
-		shrink,
-	}));
+	q.drawEllipse(QRectF(
+		photoSize - skip.x() - size,
+		photoSize - skip.y() - size,
+		size,
+		size
+	).marginsRemoved({ shrink, shrink, shrink, shrink }));
 }
 
 void Row::paintUserpic(
@@ -679,12 +732,10 @@ void Row::paintUserpic(
 			hidden);
 	}
 
-	const auto &settings = AyuSettings::getInstance();
-
 	const auto cornerBadgeShown = !_cornerBadgeUserpic
 		? _cornerBadgeShown
 		: !_cornerBadgeUserpic->layersManager.isDisplayedNone();
-	const auto storiesPeer = settings.disableStories() ? nullptr : peer
+	const auto storiesPeer = peer
 		? ((peer->isUser() || peer->isChannel()) ? peer : nullptr)
 		: nullptr;
 	const auto storiesFolder = peer ? nullptr : _id.folder();
@@ -746,10 +797,9 @@ void Row::paintUserpic(
 	const auto paletteVersionReal = style::PaletteVersion();
 	const auto paletteVersion = (paletteVersionReal & ((1 << 17) - 1));
 	const auto active = context.active ? 1 : 0;
-	const auto activeChanged = (_cornerBadgeUserpic->active != active);
 	const auto keyChanged = (_cornerBadgeUserpic->key != key)
 		|| (_cornerBadgeUserpic->paletteVersion != paletteVersion);
-	if (keyChanged || activeChanged) {
+	if (keyChanged) {
 		_cornerBadgeUserpic->cacheTTL = QImage();
 		_cornerBadgeUserpic->cacheHidden = QImage();
 	}
@@ -763,9 +813,12 @@ void Row::paintUserpic(
 		&& !(badgeUser && Data::IsUserOnline(badgeUser))
 		&& !subscribed
 		&& !insideCommunity;
+	// Only stories outline and online badge differ for active row.
+	const auto activeMatters = storiesCount
+		|| !(subscribed || communityMember);
 	if (keyChanged
 		|| !_cornerBadgeUserpic->layersManager.isFinished()
-		|| _cornerBadgeUserpic->active != active
+		|| (activeMatters && _cornerBadgeUserpic->active != active)
 		|| _cornerBadgeUserpic->hidden != (hidden ? 1 : 0)
 		|| _cornerBadgeUserpic->frameIndex != frameIndex
 		|| _cornerBadgeUserpic->storiesCount != storiesCount
@@ -811,18 +864,14 @@ void Row::paintUserpic(
 		? st::dialogsBgActive
 		: st::dialogsBg;
 	const auto size = st::dialogsCallBadgeSize;
-	const auto stroke = st::dialogsOnlineBadgeStroke;
-	const auto badge = AyuUserpic::OnlineBadgeRect(
-		context.st->photoSize,
-		size,
-		stroke);
+	const auto skip = st::dialogsCallBadgeSkip;
 	p.setOpacity(
 		_cornerBadgeUserpic->layersManager.progressForLayer(kTopLayer));
 	p.translate(context.st->padding.left(), context.st->padding.top());
 	actionPainter->paintSpeaking(
 		p,
-		badge.x(),
-		badge.y(),
+		context.st->photoSize - skip.x() - size,
+		context.st->photoSize - skip.y() - size,
 		context.width,
 		bg,
 		context.now);
@@ -911,7 +960,6 @@ void FakeRow::invalidateTopic() {
 const Ui::Text::String &FakeRow::name() const {
 	if (_name.isEmpty()) {
 		const auto from = _searchInChat
-			&& !FiltersController::filtered(_item)
 			? _item->displayFrom()
 			: nullptr;
 		const auto peer = from ? from : _item->history()->peer.get();
