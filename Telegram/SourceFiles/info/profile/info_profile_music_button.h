@@ -10,11 +10,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/buttons.h"
 #include "ui/text/format_song_name.h"
 #include "ui/text/text.h"
+#include "data/data_types.h"
+
+namespace Data {
+class DocumentMedia;
+}
 
 namespace Info::Profile {
 
 struct MusicButtonData {
 	Ui::Text::FormatSongName name;
+	QString title;
+	QString performer;
+	FullMsgId msgId;
+	std::shared_ptr<Data::DocumentMedia> mediaView;
 };
 
 class MusicButton final : public Ui::RippleButton {

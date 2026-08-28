@@ -105,12 +105,16 @@ public:
 			|| (_base && _base->isNonDefaultPlural(key));
 	}
 
+public:
+	// AyuGram: these are needed for language override support
+	void applyValue(const QByteArray &key, const QByteArray &value);
+	void resetValue(const QByteArray &key);
+	void updatePluralRules();
+
 private:
 	void setBaseId(const QString &baseId, const QString &pluralId);
 
 	void applyDifferenceToMe(const MTPDlangPackDifference &difference);
-	void applyValue(const QByteArray &key, const QByteArray &value);
-	void resetValue(const QByteArray &key);
 	void reset(const Language &language);
 	void fillFromCustomContent(
 		const QString &absolutePath,
@@ -122,7 +126,6 @@ private:
 		const QString &absolutePath,
 		const QString &relativePath,
 		const QByteArray &content);
-	void updatePluralRules();
 	void updateChoosingStickerReplacement();
 
 	Instance *_derived = nullptr;

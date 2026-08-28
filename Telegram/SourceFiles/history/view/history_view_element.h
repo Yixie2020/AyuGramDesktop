@@ -453,6 +453,7 @@ public:
 		Flag serviceFlag);
 
 	[[nodiscard]] virtual bool embedReactionsInBubble() const;
+	void revealSpoilers();
 
 	[[nodiscard]] not_null<ElementDelegate*> delegate() const;
 	[[nodiscard]] not_null<HistoryItem*> data() const;

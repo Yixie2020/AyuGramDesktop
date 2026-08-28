@@ -151,7 +151,6 @@ void ShowRichPasteToast(RichPasteToastArgs &&args) {
 	const auto weak = Ui::Toast::Show(args.parent, Ui::Toast::Config{
 		.text = std::move(text),
 		.filter = std::move(filter),
-		.similarLines = true,
 		.iconLottie = (locked ? u"toast/star_premium_2"_q : QString()),
 		.iconLottieSize = st::toastLottieIconSize,
 		.st = st.get(),

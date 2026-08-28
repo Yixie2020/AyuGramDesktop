@@ -514,8 +514,7 @@ std::unique_ptr<Ui::Text::CustomEmoji> CustomEmojiManager::create(
 		: defaultWidth;
 	return std::make_unique<Ui::CustomEmoji::Object>(
 		i->second.get(),
-		std::move(update),
-		width);
+		std::move(update));
 }
 
 Ui::Text::CustomEmojiFactory CustomEmojiManager::factory(

@@ -59,6 +59,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/sections/settings_premium.h"
 #include "settings/sections/settings_privacy_security.h"
 #include "settings/settings_scale_preview.h"
+#include "ayu/ui/settings/settings_main.h"
 #include "storage/localstorage.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/boxes/confirm_box.h"
@@ -434,6 +435,14 @@ void BuildSectionButtons(SectionBuilder &builder) {
 		.targetSection = AdvancedId(),
 		.icon = { &st::menuIconManage },
 		.keywords = { u"performance"_q, u"proxy"_q, u"experimental"_q },
+	});
+
+	// AyuGram: 隐藏模式、下载加速、消息过滤器等扩展设置入口
+	builder.addSectionButton({
+		.title = tr::ayu_AyuPreferences(),
+		.targetSection = AyuMainId(),
+		.icon = { &st::menuIconPremium },
+		.keywords = { u"ayugram"_q, u"ayu"_q, u"ghost"_q, u"filter"_q },
 	});
 
 	builder.addSectionButton({

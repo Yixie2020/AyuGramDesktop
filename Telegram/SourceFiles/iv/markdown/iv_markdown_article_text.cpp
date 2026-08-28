@@ -554,7 +554,7 @@ public:
 	std::optional<Ui::Text::CustomEmojiVerticalMetrics> vertical(
 		const style::TextStyle &textStyle) override;
 	QString replacementText() override;
-	EntitiesInText replacementEntities() override;
+	EntitiesInText replacementEntities();
 	Ui::Text::CustomEmojiSemantics semantics() override;
 	void paint(QPainter &p, const Context &context) override;
 	void unload() override;

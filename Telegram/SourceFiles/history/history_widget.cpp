@@ -373,7 +373,6 @@ HistoryWidget::HistoryWidget(
 	}))
 , _topShadow(this) {
 	setAcceptDrops(true);
-	setVisualTabOrder(true);
 
 	// The controls inside these are created in an order of their own - the
 	// top bar's selection buttons start with the one placed last, the bars
@@ -381,9 +380,6 @@ HistoryWidget::HistoryWidget(
 	// the gift button of the mute bar is set up before the one placed to
 	// its left. The outer ordering above sees each of them as a single
 	// child and keeps whatever order they have, so they arrange themselves.
-	_topBar->setVisualTabOrder(true);
-	_topBars->setVisualTabOrder(true);
-	_muteUnmute->setVisualTabOrder(true);
 
 	session().downloaderTaskFinished() | rpl::on_next([=] {
 		update();

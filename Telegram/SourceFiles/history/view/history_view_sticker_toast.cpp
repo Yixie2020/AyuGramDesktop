@@ -278,7 +278,7 @@ void StickerToast::setupEmojiPreview(
 				std::move(loader),
 				Ui::CustomEmoji::Preview()),
 			std::move(repaintLater))
-		, object(&emoji, repaint, st::emojiSize + 2 * st::emojiPadding)
+		, object(&emoji, repaint)
 		, timer(repaint) {
 		}
 

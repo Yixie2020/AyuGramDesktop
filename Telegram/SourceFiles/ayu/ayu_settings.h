@@ -51,6 +51,12 @@ enum class SendWithoutSoundOption {
 	Always = 2,
 };
 
+enum class DownloadSpeedBoost {
+	Off = 0,
+	Average = 1,
+	Extreme = 2,
+};
+
 NLOHMANN_JSON_SERIALIZE_ENUM(PeerIdDisplay, {
 	{PeerIdDisplay::Hidden, 0},
 	{PeerIdDisplay::TelegramApi, 1},
@@ -80,6 +86,12 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SendWithoutSoundOption, {
 	{SendWithoutSoundOption::Never, 0},
 	{SendWithoutSoundOption::InGhostMode, 1},
 	{SendWithoutSoundOption::Always, 2},
+})
+
+NLOHMANN_JSON_SERIALIZE_ENUM(DownloadSpeedBoost, {
+	{DownloadSpeedBoost::Off, 0},
+	{DownloadSpeedBoost::Average, 1},
+	{DownloadSpeedBoost::Extreme, 2},
 })
 
 class GhostModeAccountSettings {
@@ -353,6 +365,7 @@ public:
 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
+	[[nodiscard]] DownloadSpeedBoost downloadSpeedBoost() const { return _downloadSpeedBoost.current(); }
 
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
@@ -440,6 +453,7 @@ public:
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
 	void setStreamerMode(bool val);
+	void setDownloadSpeedBoost(DownloadSpeedBoost val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -615,6 +629,8 @@ public:
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusChanges() const { return _singleCornerRadius.changes(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeValue() const { return _streamerMode.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeChanges() const { return _streamerMode.changes(); }
+	[[nodiscard]] rpl::producer<DownloadSpeedBoost> downloadSpeedBoostValue() const { return _downloadSpeedBoost.value(); }
+	[[nodiscard]] rpl::producer<DownloadSpeedBoost> downloadSpeedBoostChanges() const { return _downloadSpeedBoost.changes(); }
 
 	friend void to_json(nlohmann::json &j, const AyuSettings &s);
 	friend void from_json(const nlohmann::json &j, AyuSettings &s);
@@ -711,6 +727,7 @@ private:
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
 	rpl::variable<bool> _streamerMode = false;
+	rpl::variable<DownloadSpeedBoost> _downloadSpeedBoost = DownloadSpeedBoost::Off;
 
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;

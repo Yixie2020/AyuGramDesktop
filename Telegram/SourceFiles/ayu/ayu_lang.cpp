@@ -66,6 +66,26 @@ void AyuLanguage::loadCachedLanguage() {
 		return;
 	}
 
+	// 1. Load bundled fallback (ships with the app) first so we always have
+	//    at least the most recent keys translated even without network.
+	//    This is keyed on the raw base id (e.g. "zh-hans") and overrides
+	//    any English source fallback for known keys.
+	{
+		const auto bundledPath = qsl(":/ayu/langs/%1.json").arg(langPackBaseId);
+		QFile bundled(bundledPath);
+		if (bundled.exists() && bundled.open(QIODevice::ReadOnly)) {
+			const auto data = bundled.readAll();
+			bundled.close();
+			QJsonParseError error{};
+			const auto doc = QJsonDocument::fromJson(data, &error);
+			if (error.error == QJsonParseError::NoError) {
+				LOG(("Loading bundled AyuGram language: %1").arg(langPackBaseId));
+				applyLanguageJson(doc);
+			}
+		}
+	}
+
+	// 2. Load cached (CDN-downloaded) pack, which may have newer or extra keys.
 	const auto cachePath = getCachePath(finalLangPackId);
 	QFile file(cachePath);
 	if (!file.exists()) {

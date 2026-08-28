@@ -51,6 +51,7 @@ public:
 	[[nodiscard]] Data::Session &owner() const;
 	[[nodiscard]] Main::Session &session() const;
 	[[nodiscard]] bool isNull() const;
+	[[nodiscard]] int32 getDC() const { return _dc; }
 
 	void automaticLoadSettingsChanged();
 

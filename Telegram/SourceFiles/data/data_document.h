@@ -116,6 +116,7 @@ public:
 
 	[[nodiscard]] Data::Session &owner() const;
 	[[nodiscard]] Main::Session &session() const;
+	[[nodiscard]] int32 getDC() const { return _dc; }
 
 	void setattributes(
 		const QVector<MTPDocumentAttribute> &attributes);

@@ -89,6 +89,9 @@ public:
 
 		return _peer;
 	}
+	void setPeer(not_null<PeerData*> peer) {
+		_peer = peer;
+	}
 	[[nodiscard]] PeerListRowId id() const {
 		return _id;
 	}

@@ -468,6 +468,12 @@ public:
 	void setPostAuthor(const QString &author);
 	void setRealId(MsgId newId);
 	void markEphemeralSent();
+	void setDeleted();
+	void markDeletedAnimated();
+	[[nodiscard]] bool isDeleted() const;
+	[[nodiscard]] bool isAyuNoForwards() const;
+	[[nodiscard]] int unsupportedTTL() const { return _unsupportedTTL; }
+	void applyTTL(TimeId destroyAt);
 	void markTextAppearingStarted();
 	void incrementReplyToTopCounter();
 	void applyEffectWatchedOnUnreadKnown();
@@ -775,8 +781,6 @@ private:
 	void applyTTL(const MTPDmessage &data);
 	void applyTTL(const MTPDmessageService &data);
 
-	void applyTTL(TimeId destroyAt);
-
 	// For an invoice button we replace the button text with a "Receipt" key.
 	// It should show the receipt for the payed invoice. Still let mobile apps do that.
 	void replaceBuyWithReceiptInMarkup();
@@ -827,6 +831,11 @@ private:
 	MessageGroupId _groupId = MessageGroupId();
 	EffectId _effectId = 0;
 	HistoryView::Element *_mainView = nullptr;
+
+	// AyuGram: deleted message tracking
+	bool _deleted = false;
+	bool _deletedAnimated = false;
+	int _unsupportedTTL = 0;
 
 	friend class HistoryView::Element;
 	friend class HistoryView::Message;

@@ -134,6 +134,8 @@ public:
 	-> std::optional<PaidInformation> {
 		return {};
 	}
+	virtual void revealSpoilers() {
+	}
 	virtual void refreshParentId(not_null<HistoryItem*> realParent) {
 	}
 	virtual void drawHighlight(

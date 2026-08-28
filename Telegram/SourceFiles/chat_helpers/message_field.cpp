@@ -575,7 +575,6 @@ auto InitMessageFieldHandlers(MessageFieldHandlersArgs &&args)
 		Ui::MarkdownEnabled{
 			std::move(args.allowMarkdownTags),
 			args.allowTypedMarkdown,
-			args.instantMarkdown
 		}
 	}));
 	if (const auto &show = args.show) {

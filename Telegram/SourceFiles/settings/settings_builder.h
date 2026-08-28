@@ -67,6 +67,7 @@ struct SearchEntry {
 	IconDescriptor icon;
 	SearchEntryCheckIcon checkIcon = SearchEntryCheckIcon::None;
 	QString deeplink;
+	QStringList altIds;
 
 	explicit operator bool() const {
 		return !id.isEmpty();
@@ -185,6 +186,7 @@ public:
 
 	struct ButtonArgs {
 		QString id;
+		QStringList altIds;
 		rpl::producer<QString> title;
 		const style::SettingsButton *st = nullptr;
 		IconDescriptor icon;

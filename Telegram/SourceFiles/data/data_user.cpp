@@ -664,6 +664,11 @@ bool UserData::readDatesPrivate() const {
 	return (flags() & UserDataFlag::ReadDatesPrivate);
 }
 
+bool UserData::isAyuNoForwards() const {
+	return (flags() & Flag::NoForwardsMyEnabled)
+		|| (flags() & Flag::NoForwardsPeerEnabled);
+}
+
 bool UserData::allowsForwarding() const {
 	return !(flags() & Flag::NoForwardsMyEnabled)
 		&& !(flags() & Flag::NoForwardsPeerEnabled);

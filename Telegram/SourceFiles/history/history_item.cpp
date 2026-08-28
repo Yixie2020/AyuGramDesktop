@@ -3117,6 +3117,31 @@ void HistoryItem::markEphemeralSent() {
 	_history->owner().requestItemRepaint(this);
 }
 
+void HistoryItem::setDeleted() {
+	_deleted = true;
+	_deletedAnimated = true;
+
+	// cleanup mentions and reactions as they tend to bug with deleted messages
+	if (isUnreadMention()) {
+		history()->unreadMentions().erase(id);
+		if (const auto topic = this->topic()) {
+			topic->unreadMentions().erase(id);
+		}
+	}
+}
+
+bool HistoryItem::isDeleted() const {
+	return _deleted;
+}
+
+bool HistoryItem::isAyuNoForwards() const {
+	return _flags & MessageFlag::AyuNoForwards;
+}
+
+void HistoryItem::markDeletedAnimated() {
+	_deletedAnimated = true;
+}
+
 void HistoryItem::markTextAppearingStarted() {
 	_flags |= MessageFlag::TextAppearingStarted;
 }

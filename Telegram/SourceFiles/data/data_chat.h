@@ -24,6 +24,7 @@ enum class ChatDataFlag {
 	CanSetUsername = (1 << 7),
 	NoForwards = (1 << 8),
 	HasWelcomeMessages = (1 << 9),
+	AyuNoForwards = (1 << 10),
 };
 inline constexpr bool is_flag_type(ChatDataFlag) { return true; };
 using ChatDataFlags = base::flags<ChatDataFlag>;
@@ -102,6 +103,7 @@ public:
 		not_null<UserData*> user);
 
 	// Like in ChannelData.
+	[[nodiscard]] bool isAyuNoForwards() const;
 	[[nodiscard]] bool allowsForwarding() const;
 	[[nodiscard]] bool canEditInformation() const;
 	[[nodiscard]] bool canEditPermissions() const;

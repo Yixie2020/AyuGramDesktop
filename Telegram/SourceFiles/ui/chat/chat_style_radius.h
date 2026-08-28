@@ -17,4 +17,9 @@ namespace Ui {
 
 extern const char kOptionUseSmallMsgBubbleRadius[];
 
+// AyuGram: bubble radius override support
+void SetAppliedBubbleRadius(int value);
+void SetBubbleRadiusOverride(int value);
+void ClearBubbleRadiusOverride();
+
 } // namespace Ui

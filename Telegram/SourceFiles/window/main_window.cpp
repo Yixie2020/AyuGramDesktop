@@ -692,35 +692,9 @@ void MainWindow::refreshTitleWidget() {
 }
 
 void MainWindow::setupCanaryTitleLabel() {
-	const auto title = titleWidget();
-	if (!title) {
-		return;
-	}
-	const auto layout = Ui::Platform::TitleControlsLayout::Instance();
-	const auto label = Ui::CreateTitleSubWidget(
-		title,
-		st::titleSubWidgetStyle,
-		rpl::single(Core::CanaryTitleLabel()),
-		layout->value(
-		) | rpl::map([](const Ui::Platform::TitleLayout &layout) {
-			return layout.onLeft() ? style::al_right : style::al_left;
-		}),
-		additionalContentPaddingValue());
-	label->lifetime().add([layout] {});
-
-	title->shownValue(
-	) | rpl::skip(1) | rpl::on_next([=] {
-		updateTitle();
-	}, lifetime());
 }
 
 QString MainWindow::nativeTitleSuffix() const {
-	if constexpr (Core::BuildIsCanary) {
-		const auto title = titleWidget();
-		if (!title || title->isHidden()) {
-			return u" \u2022 "_q + Core::CanaryTitleLabel();
-		}
-	}
 	return QString();
 }
 

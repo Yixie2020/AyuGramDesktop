@@ -130,8 +130,6 @@ void FiltersMenu::setup() {
 	// above the scroll area, and inside it the folders list (entered at
 	// its roving Tab-stop), the favorite link and the edit button - even
 	// as folders are reordered and the favorite appears or disappears.
-	_outer.setVisualTabOrder(true);
-	_container->setVisualTabOrder(true);
 	_outer.paintRequest(
 	) | rpl::on_next([=](QRect clip) {
 		auto p = QPainter(&_outer);
@@ -330,8 +328,6 @@ void FiltersMenu::setListTabStop(not_null<Ui::SideBarButton*> stop) {
 	// The Tab-stop moved outside of any layout change, so a Tab entering
 	// the sidebar from outside would still walk to the demoted button's
 	// old chain position - rewire the visual order right away.
-	_outer.refreshVisualTabOrder();
-	_container->refreshVisualTabOrder();
 }
 
 bool FiltersMenu::listFocused() const {

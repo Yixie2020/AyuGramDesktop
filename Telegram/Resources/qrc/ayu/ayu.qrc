@@ -33,4 +33,7 @@
         <file alias="icons/ayu/donates/tron.svg">../../icons/ayu/donates/tron.svg</file>
         <file alias="icons/ayu/donates/support_logo.svg">../../icons/ayu/donates/support_logo.svg</file>
     </qresource>
+    <qresource prefix="/ayu">
+        <file alias="langs/zh-hans.json">langs/zh-hans.json</file>
+    </qresource>
 </RCC>

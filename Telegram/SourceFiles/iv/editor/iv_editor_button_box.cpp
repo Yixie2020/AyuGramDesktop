@@ -347,7 +347,7 @@ void EditRichButtonBox(
 			Ui::InputField::EditLinkAction action) {
 		return Ui::InputField::IsCustomDateLink(link)
 			&& date(selection, std::move(text), link, action);
-	}, Ui::InputField::EditLinkItems::DateOnly);
+	});
 	label->setTextWithTags(
 		ConvertRichTextToEditorTags(args.data.label).text,
 		Ui::InputField::HistoryAction::Clear);

@@ -60,6 +60,9 @@ if (WIN32)
     )
 endif()
 
+include(cmake/generate_update_keys.cmake)
+generate_update_keys(Telegram ${res_loc}/update)
+
 set_target_properties(Telegram PROPERTIES AUTOMOC ON)
 
 target_link_libraries(Telegram
@@ -751,6 +754,10 @@ PRIVATE
     core/ui_integration.h
     core/update_checker.cpp
     core/update_checker.h
+    core/update_keys.cpp
+    core/update_keys.h
+    core/update_verify.cpp
+    core/update_verify.h
     core/utils.cpp
     core/utils.h
     core/version.h
@@ -1558,6 +1565,8 @@ PRIVATE
     intro/intro_qr.h
     intro/intro_signup.cpp
     intro/intro_signup.h
+    intro/intro_start.cpp
+    intro/intro_start.h
     intro/intro_step.cpp
     intro/intro_step.h
     intro/intro_widget.cpp
@@ -2160,6 +2169,8 @@ PRIVATE
     ui/controls/silent_toggle.cpp
     ui/controls/silent_toggle.h
     ui/controls/table_rows.cpp
+    ui/controls/title_sub_widget.cpp
+    ui/controls/title_sub_widget.h
     ui/controls/table_rows.h
     ui/controls/userpic_button.cpp
     ui/controls/userpic_button.h

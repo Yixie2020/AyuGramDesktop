@@ -41,7 +41,8 @@ void initUiSettings() {
 	AyuUiSettings::setWideMultiplier(settings.wideMultiplier());
 	AyuUiSettings::setMaterialSwitches(settings.materialSwitches());
 	AyuUiSettings::setAvatarCorners(settings.avatarCorners());
-	Ui::SetAppliedBubbleRadius(settings.messageBubbleRadius());
+	// TODO: SetAppliedBubbleRadius was removed in tdesktop v7.1.3
+	// Ui::SetAppliedBubbleRadius(settings.messageBubbleRadius());
 }
 
 void initDatabase() {
