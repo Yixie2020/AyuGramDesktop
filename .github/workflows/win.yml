@@ -97,13 +97,11 @@ jobs:
         working-directory: ${{ env.TBUILD }}\AyuGramDesktop
         run: python Telegram\build\prepare\prepare.py silent
 
-      - name: Configure
+      - name: Configure and Build
         working-directory: ${{ env.TBUILD }}\AyuGramDesktop\Telegram
-        run: cmake -B ..\out -G Ninja -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        working-directory: ${{ env.TBUILD }}\AyuGramDesktop
-        run: cmake --build out --parallel 4 --target Telegram
+        run: |
+          call configure.bat -G Ninja -D CMAKE_BUILD_TYPE=Release
+          cmake --build ..\out --parallel 4 --target Telegram
 
       - name: Package
         working-directory: ${{ env.TBUILD }}\AyuGramDesktop\out
