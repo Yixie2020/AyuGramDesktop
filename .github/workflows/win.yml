@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build:
     name: Windows x64
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 360
 
     defaults:
@@ -38,11 +38,17 @@ jobs:
           submodules: recursive
           path: ${{ env.TBUILD }}\AyuGramDesktop
 
+      - name: Install ATL and build tools
+        shell: powershell
+        run: |
+          # Install ATL component for breakpad
+          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" modify --installPath "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise" --add Microsoft.VisualStudio.Component.VC.ATL --quiet --wait
+          choco install ninja -y
+
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Install build tools
-        run: choco install ninja -y
+        with:
+          arch: x64
 
       # 缓存拆分：每个主要依赖单独缓存，失败后只需重编译出错的部分
       - name: Restore Qt cache
@@ -79,6 +85,13 @@ jobs:
         with:
           path: ${{ env.TBUILD }}\Libraries\local
           key: win64-local-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+
+      - name: Restore other libs cache
+        id: cache-other
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries\win64
+          key: win64-other-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
 
       - name: Prepare libraries
         working-directory: ${{ env.TBUILD }}\AyuGramDesktop
