@@ -1,0 +1,112 @@
+name: macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      architecture:
+        description: Target architecture
+        type: choice
+        options: [arm64, x86_64, universal]
+        default: arm64
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ayugram-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: macOS ${{ inputs.architecture || 'arm64' }}
+    runs-on: macos-15
+    timeout-minutes: 360
+    env:
+      TDESKTOP_API_ID: ${{ vars.TDESKTOP_API_ID }}
+      TDESKTOP_API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+      TARGET_ARCH: ${{ inputs.architecture || 'arm64' }}
+
+    steps:
+      - name: Validate build configuration
+        run: |
+          if [[ ! "$TDESKTOP_API_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'Set repository variable TDESKTOP_API_ID before building.' >&2
+            exit 1
+          fi
+          if [[ ! "$TDESKTOP_API_HASH" =~ ^[[:xdigit:]]{32}$ ]]; then
+            echo 'Set repository secret TDESKTOP_API_HASH before building.' >&2
+            exit 1
+          fi
+
+      - name: Clone sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build tools
+        run: |
+          brew install automake libtool meson nasm ninja pkg-config ccache
+
+      - name: Restore libraries cache
+        id: libraries-cache
+        uses: actions/cache@v4
+        with:
+          path: Libraries
+          key: macos-${{ env.TARGET_ARCH }}-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+          restore-keys: macos-${{ env.TARGET_ARCH }}-
+
+      - name: Prepare libraries
+        if: steps.libraries-cache.outputs.cache-hit != 'true'
+        run: |
+          python3 Telegram/build/prepare/prepare.py silent
+
+      - name: Restore compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/ccache
+          key: ccache-macos-${{ env.TARGET_ARCH }}-${{ github.sha }}
+          restore-keys: ccache-macos-${{ env.TARGET_ARCH }}-
+
+      - name: Configure
+        working-directory: Telegram
+        run: |
+          ./configure.sh -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DTDESKTOP_API_ID=$TDESKTOP_API_ID \
+            -DTDESKTOP_API_HASH=$TDESKTOP_API_HASH \
+            -DDESKTOP_APP_DISABLE_AUTOUPDATE=ON
+
+      - name: Build
+        run: |
+          cmake --build out --parallel 3 --target Telegram
+          ccache --show-stats
+
+      - name: Package
+        working-directory: out
+        run: |
+          mkdir -p release
+          hdiutil create -volname "AyuGram" \
+            -srcfolder AyuGram.app \
+            -ov -format UDZO \
+            release/AyuGram.dmg
+          shasum -a 256 release/AyuGram.dmg > release/AyuGram.dmg.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-macos-${{ env.TARGET_ARCH }}
+          path: out/release/*
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/release/AyuGram.dmg
+            out/release/AyuGram.dmg.sha256
+          draft: false
