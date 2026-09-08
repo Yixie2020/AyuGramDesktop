@@ -44,16 +44,43 @@ jobs:
       - name: Install build tools
         run: choco install ninja -y
 
-      - name: Restore libraries cache
-        id: libraries-cache
+      # 缓存拆分：每个主要依赖单独缓存，失败后只需重编译出错的部分
+      - name: Restore Qt cache
+        id: cache-qt
         uses: actions/cache@v4
         with:
-          path: ${{ env.TBUILD }}\Libraries
-          key: win64-libs-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
-          restore-keys: win64-libs-
+          path: ${{ env.TBUILD }}\Libraries\Qt-6.11.1
+          key: win64-qt-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+
+      - name: Restore OpenSSL cache
+        id: cache-openssl
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries\openssl3
+          key: win64-openssl-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+
+      - name: Restore FFmpeg cache
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries\ffmpeg
+          key: win64-ffmpeg-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+
+      - name: Restore tg_owt cache
+        id: cache-tg-owt
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries\tg_owt
+          key: win64-tg-owt-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+
+      - name: Restore local libs cache
+        id: cache-local
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries\local
+          key: win64-local-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
 
       - name: Prepare libraries
-        if: steps.libraries-cache.outputs.cache-hit != 'true'
         working-directory: ${{ env.TBUILD }}\AyuGramDesktop
         run: python Telegram\build\prepare\prepare.py silent
 
