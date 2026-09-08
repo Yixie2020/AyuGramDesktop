@@ -25,22 +25,9 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 360
     env:
-      TDESKTOP_API_ID: ${{ vars.TDESKTOP_API_ID }}
-      TDESKTOP_API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
       TARGET_ARCH: ${{ inputs.architecture || 'arm64' }}
 
     steps:
-      - name: Validate build configuration
-        run: |
-          if [[ ! "$TDESKTOP_API_ID" =~ ^[1-9][0-9]*$ ]]; then
-            echo 'Set repository variable TDESKTOP_API_ID before building.' >&2
-            exit 1
-          fi
-          if [[ ! "$TDESKTOP_API_HASH" =~ ^[[:xdigit:]]{32}$ ]]; then
-            echo 'Set repository secret TDESKTOP_API_HASH before building.' >&2
-            exit 1
-          fi
-
       - name: Clone sources
         uses: actions/checkout@v4
         with:
@@ -48,7 +35,7 @@ jobs:
 
       - name: Install build tools
         run: |
-          brew install automake libtool meson nasm ninja pkg-config ccache
+          brew install automake libtool meson nasm ninja pkg-config
 
       - name: Restore libraries cache
         id: libraries-cache
@@ -63,28 +50,14 @@ jobs:
         run: |
           python3 Telegram/build/prepare/prepare.py silent
 
-      - name: Restore compiler cache
-        uses: actions/cache@v4
-        with:
-          path: ~/ccache
-          key: ccache-macos-${{ env.TARGET_ARCH }}-${{ github.sha }}
-          restore-keys: ccache-macos-${{ env.TARGET_ARCH }}-
-
       - name: Configure
         working-directory: Telegram
         run: |
-          ./configure.sh -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DTDESKTOP_API_ID=$TDESKTOP_API_ID \
-            -DTDESKTOP_API_HASH=$TDESKTOP_API_HASH \
-            -DDESKTOP_APP_DISABLE_AUTOUPDATE=ON
+          ./configure.sh -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: |
           cmake --build out --parallel 3 --target Telegram
-          ccache --show-stats
 
       - name: Package
         working-directory: out

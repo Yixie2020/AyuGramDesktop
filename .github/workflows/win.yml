@@ -2,12 +2,6 @@ name: Windows
 
 on:
   workflow_dispatch:
-    inputs:
-      architecture:
-        description: Target architecture
-        type: choice
-        options: [x64]
-        default: x64
   push:
     tags:
       - 'v*'
@@ -21,36 +15,20 @@ concurrency:
 
 jobs:
   build:
-    name: Windows ${{ inputs.architecture || 'x64' }}
+    name: Windows x64
     runs-on: windows-latest
     timeout-minutes: 360
-    env:
-      TDESKTOP_API_ID: ${{ vars.TDESKTOP_API_ID }}
-      TDESKTOP_API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
-      ARCH: ${{ inputs.architecture || 'x64' }}
 
     defaults:
       run:
         shell: cmd
 
     steps:
-      - name: Validate build configuration
-        run: |
-          if "%TDESKTOP_API_ID%"=="" (
-            echo Set repository variable TDESKTOP_API_ID before building.
-            exit /b 1
-          )
-          if "%TDESKTOP_API_HASH%"=="" (
-            echo Set repository secret TDESKTOP_API_HASH before building.
-            exit /b 1
-          )
-
       - name: Prepare directories
         run: |
           mkdir %userprofile%\TBuild\Libraries
           mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
           echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
-          echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64>>%GITHUB_ENV%
 
       - name: Clone sources
         uses: actions/checkout@v4
@@ -60,13 +38,10 @@ jobs:
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: ${{ env.ARCH }}
 
       - name: Install build tools
         run: |
-          choco install ninja ccache -y
-          pip install meson
+          choco install ninja -y
 
       - name: Restore libraries cache
         id: libraries-cache
@@ -82,29 +57,15 @@ jobs:
         run: |
           python Telegram\build\prepare\prepare.py silent
 
-      - name: Restore compiler cache
-        uses: actions/cache@v4
-        with:
-          path: %USERPROFILE%\ccache
-          key: ccache-win64-${{ github.sha }}
-          restore-keys: ccache-win64-
-
       - name: Configure
         working-directory: %TBUILD%\AyuGramDesktop\Telegram
         run: |
-          cmake -B ..\out -G Ninja ^
-            -DCMAKE_BUILD_TYPE=Release ^
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache ^
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ^
-            -DTDESKTOP_API_ID=%TDESKTOP_API_ID% ^
-            -DTDESKTOP_API_HASH=%TDESKTOP_API_HASH% ^
-            -DDESKTOP_APP_DISABLE_AUTOUPDATE=ON
+          cmake -B ..\out -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         working-directory: %TBUILD%\AyuGramDesktop
         run: |
           cmake --build out --parallel 4 --target Telegram
-          ccache --show-stats
 
       - name: Package
         working-directory: %TBUILD%\AyuGramDesktop\out
