@@ -72,13 +72,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_iv.h"
 #include "styles/style_polls.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/filters/filters_controller.h"
-#include "ayu/features/message_shot/message_shot.h"
-#include "styles/style_ayu_icons.h"
-
-
 namespace HistoryView {
 namespace {
 
@@ -90,7 +83,7 @@ base::options::toggle UnlimitedMessageWidth({
 	.restartRequired = true,
 });
 
-constexpr auto kPlayStatusLimit = 12;
+constexpr auto kPlayStatusLimit = 2;
 constexpr auto kMaxWidth = (1 << 16) - 1;
 constexpr auto kMaxNiceToReadLines = 6;
 const auto kPsaTooltipPrefix = "cloud_lng_tooltip_psa_";
@@ -476,24 +469,6 @@ struct BadgePillGeometry {
 		.width = std::max(contentWidth, height),
 		.height = height,
 	};
-}
-
-[[nodiscard]] int ComputeRightBadgeWidth(
-		not_null<const RightBadge*> badge) {
-	const auto boostWidth = badge->boosts.isEmpty()
-		? 0
-		: (st::msgTagBadgeBoostSkip + badge->boosts.maxWidth());
-	if (badge->role == BadgeRole::User) {
-		const auto tagWidth = (badge->channel
-				&& AyuSettings::getInstance().replaceBottomInfoWithIcons())
-			? st::inChannelBadgeIcon.width()
-			: badge->tag.isEmpty()
-			? 0
-			: badge->tag.maxWidth();
-		return tagWidth + boostWidth;
-	}
-	const auto pill = ComputeBadgePillGeometry(badge);
-	return pill.width + boostWidth;
 }
 
 } // namespace
@@ -1041,35 +1016,13 @@ void Message::refreshRightBadge() {
 	if (const auto badge = Get<RightBadge>(); badge && badge->overridden) {
 		return;
 	}
-	if ((hasOutLayout() || context() == Context::WelcomeMessages)
-			&& !AyuFeatures::MessageShot::isTakingShot()) {
-		if (Has<RightBadge>()) {
-			RemoveComponents(RightBadge::Bit());
-		}
-		return;
-	}
-	if (AyuFeatures::MessageShot::ignoreRender(
-			AyuFeatures::MessageShot::RenderPart::HeaderDecorations)) {
+	if (hasOutLayout() || context() == Context::WelcomeMessages) {
 		if (Has<RightBadge>()) {
 			RemoveComponents(RightBadge::Bit());
 		}
 		return;
 	}
 	const auto item = data();
-	const auto drawChannelBadge = [&] {
-		if (item->isDiscussionPost()) {
-			return (delegate()->elementContext() != Context::Replies);
-		} else if (item->author()->isMegagroup()) {
-			if (const auto msgsigned = item->Get<HistoryMessageSigned>()) {
-				if (!msgsigned->viaBusinessBot) {
-					return false;
-				}
-			}
-		}
-		return item->history()->peer->isMegagroup()
-			&& item->author()->isChannel()
-			&& !item->out();
-	}();
 	const auto [text, role, special] = [&]() -> std::tuple<QString, BadgeRole, bool> {
 		if (item->isDiscussionPost()) {
 			return {
@@ -1077,7 +1030,7 @@ void Message::refreshRightBadge() {
 					? QString()
 					: tr::lng_channel_badge(tr::now),
 				BadgeRole::User,
-				drawChannelBadge,
+				true,
 			};
 		} else if (item->author()->isMegagroup()) {
 			if (const auto msgsigned = item->Get<HistoryMessageSigned>()) {
@@ -1086,12 +1039,6 @@ void Message::refreshRightBadge() {
 					return { msgsigned->author, BadgeRole::User, false };
 				}
 			}
-		} else if (drawChannelBadge) {
-			return {
-				tr::lng_channel_badge(tr::now),
-				BadgeRole::User,
-				true,
-			};
 		}
 		const auto channel = item->history()->peer->asMegagroup();
 		const auto user = item->author()->asUser();
@@ -1159,7 +1106,6 @@ void Message::refreshRightBadge() {
 	const auto badge = Get<RightBadge>();
 	badge->role = role;
 	badge->special = special || (text.isEmpty() && !tagText.empty());
-	badge->channel = drawChannelBadge;
 	badge->tagLink = nullptr;
 	badge->ripple = nullptr;
 	if (tagText.empty()) {
@@ -1183,12 +1129,30 @@ void Message::refreshRightBadge() {
 	} else {
 		badge->boosts.clear();
 	}
-	badge->width = ComputeRightBadgeWidth(badge);
+	const auto boostWidth = badge->boosts.isEmpty()
+		? 0
+		: (st::msgTagBadgeBoostSkip + badge->boosts.maxWidth());
+	if (badge->role == BadgeRole::User) {
+		const auto tagWidth = badge->tag.isEmpty()
+			? 0
+			: badge->tag.maxWidth();
+		badge->width = tagWidth + boostWidth;
+	} else {
+		const auto &padding = st::msgTagBadgePadding;
+		const auto textWidth = badge->tag.maxWidth();
+		const auto contentWidth = padding.left()
+			+ textWidth
+			+ padding.right();
+		const auto pillHeight = padding.top()
+			+ st::msgFont->height
+			+ padding.bottom();
+		badge->width = std::max(contentWidth, pillHeight) + boostWidth;
+	}
 }
 
 int Message::rightBadgeWidth() const {
 	const auto badge = Get<RightBadge>();
-	return badge ? ComputeRightBadgeWidth(badge) : 0;
+	return badge ? badge->width : 0;
 }
 
 void Message::applyGroupAdminChanges(
@@ -1716,15 +1680,13 @@ int Message::marginTop() const {
 	}
 	result += displayedDateHeight();
 	if (const auto bar = Get<UnreadBar>()) {
-		if (!AyuFeatures::MessageShot::isTakingShot()) {
-			result += bar->height();
-		}
+		result += bar->height();
 	}
 	if (const auto bar = Get<ForumThreadBar>()) {
 		result += bar->height();
 	}
 	if (const auto service = Get<ServicePreMessage>()) {
-		if (!service->below && !AyuFeatures::MessageShot::isTakingShot()) {
+		if (!service->below) {
 			result += service->height;
 		}
 	}
@@ -1761,8 +1723,9 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 
 	const auto hasGesture = context.gestureHorizontal.translation
 		&& (context.gestureHorizontal.msgBareId == item->fullId().msg.bare);
+	const auto gestureShift = context.gestureHorizontal.visualTranslation();
 	if (hasGesture) {
-		p.translate(context.gestureHorizontal.translation, 0);
+		p.translate(gestureShift, 0);
 	}
 	const auto selectionModeResult = delegate()->elementInSelectionMode(this);
 	const auto selectionTranslation = (selectionModeResult.progress > 0)
@@ -1812,7 +1775,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 	auto mediaOnBottom = (mediaDisplayed && media->isBubbleBottom()) || check || (entry/* && entry->isBubbleBottom()*/);
 	auto mediaOnTop = (mediaDisplayed && media->isBubbleTop()) || (entry && entry->isBubbleTop());
 
-	const auto displayInfo = needInfoDisplay() && !AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date);
+	const auto displayInfo = needInfoDisplay();
 	const auto reactionsInBubble = _reactions && embedReactionsInBubble();
 
 	// We need to count geometry without keyboard and reactions
@@ -1874,12 +1837,6 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		if (selectionTranslation) {
 			p.translate(selectionTranslation, 0);
 		}
-	}
-
-	const auto deletedFade = deletedOpacity();
-	const auto savedOpacityForDeleted = p.opacity();
-	if (deletedFade < 1.) {
-		p.setOpacity(savedOpacityForDeleted * deletedFade);
 	}
 
 	const auto roll = media ? media->bubbleRoll() : Media::BubbleRoll();
@@ -2246,10 +2203,6 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 
 	p.restoreTextPalette();
 
-	if (deletedFade < 1.) {
-		p.setOpacity(savedOpacityForDeleted);
-	}
-
 	if (context.highlightPathCache
 		&& !context.highlightPathCache->isEmpty()) {
 		const auto alpha = int(0.25
@@ -2276,10 +2229,9 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		}
 	}
 	if (hasGesture) {
-		p.translate(-context.gestureHorizontal.translation, 0);
+		p.translate(-gestureShift, 0);
 		if (context.reactionInfo && context.reactionInfo->effectPaint) {
-			const auto shift = context.gestureHorizontal.translation;
-			context.reactionInfo->effectOffset += QPoint(shift, 0);
+			context.reactionInfo->effectOffset += QPoint(gestureShift, 0);
 		}
 
 		constexpr auto kShiftRatio = 1.5;
@@ -2287,13 +2239,17 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		constexpr auto kMaxHeightRatio = 3.5;
 		constexpr auto kStrokeWidth = 2.;
 		constexpr auto kWaveWidth = 10.;
+		const auto mirrored = !context.gestureHorizontal.inverted;
 		const auto isLeftSize = !context.outbg
 			|| (delegate()->elementChatMode() == ElementChatMode::Wide);
 		const auto ratio = std::min(context.gestureHorizontal.ratio, 1.);
 		const auto reachRatio = context.gestureHorizontal.reachRatio;
 		const auto size = st::historyFastShareSize;
+		const auto bubbleRight = mirrored
+			? (width() - g.x())
+			: rect::right(g);
 		const auto outerWidth = st::historySwipeIconSkip
-			+ (isLeftSize ? rect::right(g) : width())
+			+ (isLeftSize ? bubbleRight : width())
 			+ ((g.height() < size * kMaxHeightRatio)
 				? rightActionSize().value_or(QSize()).width()
 				: 0);
@@ -2322,6 +2278,10 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		pen.setWidthF(strokeWidth - (1. * (reachScale / kBouncePart)));
 		const auto arcRect = rect - Margins(strokeWidth);
 		p.save();
+		if (mirrored) {
+			p.translate(width(), 0);
+			p.scale(-1., 1.);
+		}
 		{
 			auto hq = PainterHighQualityEnabler(p);
 			p.setPen(Qt::NoPen);
@@ -2417,10 +2377,6 @@ void Message::paintCommentsButton(
 		Painter &p,
 		QRect &g,
 		const PaintContext &context) const {
-	if (AyuFeatures::MessageShot::isTakingShot()) {
-		return;
-	}
-
 	if (!data()->repliesAreComments() && !data()->externalReply()) {
 		return;
 	}
@@ -2437,8 +2393,7 @@ void Message::paintCommentsButton(
 	auto width = g.width();
 
 	if (_comments->ripple) {
-		const auto was = p.opacity(); // for semi-transparent deleted messages
-		p.setOpacity(was * st::historyPollRippleOpacity);
+		p.setOpacity(st::historyPollRippleOpacity);
 		const auto colorOverride = &stm->msgWaveformInactive->c;
 		_comments->ripple->paint(
 			p,
@@ -2449,7 +2404,7 @@ void Message::paintCommentsButton(
 		if (_comments->ripple->empty()) {
 			_comments->ripple.reset();
 		}
-		p.setOpacity(was);
+		p.setOpacity(1.);
 	}
 
 	left += st::historyCommentsSkipLeft;
@@ -2473,28 +2428,7 @@ void Message::paintCommentsButton(
 	} else {
 		auto &list = _comments->userpics;
 		const auto limit = HistoryMessageViews::kMaxRecentRepliers;
-		auto filteredRepliers = std::vector<PeerId>();
-		filteredRepliers.reserve(std::min(int(views->recentRepliers.size()), limit));
-		for (const auto peerId : views->recentRepliers) {
-			const auto peer = history()->owner().peer(peerId);
-			if (!peer || FiltersController::isBlocked(peer)) {
-				continue;
-			}
-			filteredRepliers.push_back(peerId);
-			if (filteredRepliers.size() == limit) {
-				break;
-			}
-		}
-		const auto count = int(filteredRepliers.size());
-		if (!count) {
-			const auto &icon = stm->historyComments;
-			icon.paint(
-				p,
-				left,
-				top + (st::historyCommentsButtonHeight - icon.height()) / 2,
-				width);
-			left += icon.width();
-		} else {
+		const auto count = std::min(int(views->recentRepliers.size()), limit);
 		const auto single = st::historyCommentsUserpics.size;
 		const auto shift = st::historyCommentsUserpics.shift;
 		const auto regenerate = [&] {
@@ -2506,7 +2440,7 @@ void Message::paintCommentsButton(
 				const auto peer = entry.peer;
 				auto &view = entry.view;
 				const auto wasView = view.cloud.get();
-				if (filteredRepliers[i] != peer->id
+				if (views->recentRepliers[i] != peer->id
 					|| peer->userpicUniqueKey(view) != entry.uniqueKey
 					|| view.cloud.get() != wasView) {
 					return true;
@@ -2516,7 +2450,7 @@ void Message::paintCommentsButton(
 		}();
 		if (regenerate) {
 			for (auto i = 0; i != count; ++i) {
-				const auto peerId = filteredRepliers[i];
+				const auto peerId = views->recentRepliers[i];
 				if (i == list.size()) {
 					list.push_back(UserpicInRow{
 						history()->owner().peer(peerId)
@@ -2539,7 +2473,6 @@ void Message::paintCommentsButton(
 			top + (st::historyCommentsButtonHeight - single) / 2,
 			_comments->cachedUserpics);
 		left += single + (count - 1) * (single - shift);
-		}
 	}
 
 	left += st::historyCommentsSkipText;
@@ -2595,14 +2528,19 @@ void Message::paintFromName(
 		}
 		return &info->nameText();
 	}();
-	const auto &settings = AyuSettings::getInstance();
-	const auto hidePremiumStatuses = settings.hidePremiumStatuses();
-	const auto statusWidth = _fromNameStatus && !hidePremiumStatuses
+	const auto statusWidth = _fromNameStatus
 		? st::dialogsPremiumIcon.icon.width()
 		: 0;
-	const auto nameAvailableWidth = (statusWidth && availableWidth > statusWidth)
-		? (availableWidth - statusWidth)
-		: availableWidth;
+	const auto via = item->Get<HistoryMessageVia>();
+	const auto viaShown = via && !displayForwardedFrom() && via->width;
+	const auto viaSkipWidth = viaShown
+		? (via->width + st::msgServiceFont->spacew)
+		: 0;
+	const auto nameAvailableWidth = std::max(
+		((statusWidth && availableWidth > statusWidth)
+			? (availableWidth - statusWidth)
+			: availableWidth) - viaSkipWidth,
+		0);
 	if (statusWidth && availableWidth > statusWidth) {
 		const auto x = availableLeft
 			+ std::min(nameAvailableWidth, nameText->maxWidth());
@@ -2665,8 +2603,8 @@ void Message::paintFromName(
 		.availableWidth = nameAvailableWidth,
 		.elisionLines = 1,
 	});
-	const auto skipWidth = nameText->maxWidth()
-		+ (_fromNameStatus && !hidePremiumStatuses
+	const auto skipWidth = nameWidth
+		+ (_fromNameStatus
 			? (st::dialogsPremiumIcon.icon.width()
 				+ st::msgServiceFont->spacew)
 			: 0)
@@ -2674,7 +2612,6 @@ void Message::paintFromName(
 	availableLeft += skipWidth;
 	availableWidth -= skipWidth;
 
-	auto via = item->Get<HistoryMessageVia>();
 	if (via && !displayForwardedFrom() && availableWidth > 0) {
 		p.setPen(stm->msgServiceFg);
 		paintLinkRipple(
@@ -2711,18 +2648,8 @@ void Message::paintFromName(
 				: st::rankUserFg->c;
 			const auto badgeLeft = trect.left()
 				+ trect.width()
-				- badgeWidth;
-			if (badge->channel
-				&& AyuSettings::getInstance().replaceBottomInfoWithIcons()) {
-				const auto badgeTop = trect.top()
-					+ (st::msgNameFont->height
-						- stm->channelBadgeIcon.height()) / 2;
-				stm->channelBadgeIcon.paint(
-					p,
-					badgeLeft,
-					badgeTop,
-					width());
-			} else if (badge->role != BadgeRole::User) {
+				- badge->width;
+			if (badge->role != BadgeRole::User) {
 				auto bgColor = badgeColor;
 				bgColor.setAlphaF(0.15);
 				const auto pill = ComputeBadgePillGeometry(badge);
@@ -2737,7 +2664,7 @@ void Message::paintFromName(
 				p.setPen(Qt::NoPen);
 				p.setBrush(bgColor);
 				{
-				auto hq = PainterHighQualityEnabler(p);
+					auto hq = PainterHighQualityEnabler(p);
 					p.drawRoundedRect(
 						pillRect,
 						pill.height / 2.,
@@ -3669,15 +3596,7 @@ BottomRippleMask Message::bottomRippleMask(int buttonHeight) const {
 	const auto buttonWidth = g.width();
 	const auto &large = CachedCornersMasks(Radius::BubbleLarge);
 	const auto &small = CachedCornersMasks(Radius::BubbleSmall);
-	auto rounding = countBubbleRounding();
-	if (AyuSettings::getInstance().removeMessageTail()) {
-		if (rounding.bottomLeft == Corner::Tail) {
-			rounding.bottomLeft = Corner::Large;
-		}
-		if (rounding.bottomRight == Corner::Tail) {
-			rounding.bottomRight = Corner::Large;
-		}
-	}
+	const auto rounding = countBubbleRounding();
 	const auto icon = (rounding.bottomLeft == Corner::Tail)
 		? &st::historyBubbleTailInLeft
 		: (rounding.bottomRight == Corner::Tail)
@@ -4324,11 +4243,23 @@ bool Message::getStateFromName(
 		const auto statusWidth = (from && _fromNameStatus)
 			? st::dialogsPremiumIcon.icon.width()
 			: 0;
+		const auto via = item->Get<HistoryMessageVia>();
+		const auto viaShown = via && !displayForwardedFrom() && via->width;
+		const auto viaSkipWidth = viaShown
+			? (via->width + st::msgServiceFont->spacew)
+			: 0;
+		const auto nameAvailableWidth = std::max(
+			((statusWidth && availableWidth > statusWidth)
+				? (availableWidth - statusWidth)
+				: availableWidth) - viaSkipWidth,
+			0);
+		const auto nameWidth = std::min(
+			nameText->maxWidth(),
+			nameAvailableWidth);
 		if (statusWidth && availableWidth > statusWidth) {
-			const auto x = availableLeft + std::min(
-				availableWidth - statusWidth,
-				nameText->maxWidth()
-			) - (_fromNameStatus->custom ? (2 * _fromNameStatus->skip) : 0);
+			const auto x = availableLeft
+				+ nameWidth
+				- (_fromNameStatus->custom ? (2 * _fromNameStatus->skip) : 0);
 			const auto checkWidth = _fromNameStatus->custom
 				? (st::emojiSize - 2 * _fromNameStatus->skip)
 				: statusWidth;
@@ -4340,14 +4271,14 @@ bool Message::getStateFromName(
 		}
 		if (point.x() >= availableLeft
 			&& point.x() < availableLeft + availableWidth
-			&& point.x() < availableLeft + nameText->maxWidth()) {
+			&& point.x() < availableLeft + nameWidth) {
 			outResult->link = fromLink();
 			recordLinkRipplePoint(point, trect.topLeft());
 			_fromLinkRipplePointSet = 1;
 			return true;
 		}
 
-		const auto skipWidth = nameText->maxWidth()
+		const auto skipWidth = nameWidth
 			+ (_fromNameStatus
 				? (st::dialogsPremiumIcon.icon.width()
 					+ st::msgServiceFont->spacew)
@@ -4356,7 +4287,6 @@ bool Message::getStateFromName(
 		availableLeft += skipWidth;
 		availableWidth -= skipWidth;
 
-		auto via = item->Get<HistoryMessageVia>();
 		if (via
 			&& !displayForwardedFrom()
 			&& point.x() >= availableLeft
@@ -5963,7 +5893,9 @@ bool Message::unwrapped() const {
 		return false;
 	}
 	const auto media = this->media();
-	return media == nullptr && item->isEmpty();
+	return media
+		? (!hasVisibleText() && media->unwrapped())
+		: item->isEmpty();
 }
 
 int Message::minWidthForMedia() const {
@@ -6046,10 +5978,6 @@ bool Message::displayRightActionComments() const {
 }
 
 std::optional<QSize> Message::rightActionSize() const {
-	if (AyuFeatures::MessageShot::isTakingShot()) {
-		return {};
-	}
-
 	if (displayRightActionComments()) {
 		const auto views = data()->Get<HistoryMessageViews>();
 		Assert(views != nullptr);
@@ -6071,11 +5999,6 @@ std::optional<QSize> Message::rightActionSize() const {
 }
 
 bool Message::displayFastShare() const {
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.hideFastShare()) {
-		return false;
-	}
-
 	const auto item = data();
 	const auto peer = item->history()->peer;
 	if (!item->allowsForward() || IsAnchoredEphemeral(item)) {
@@ -6430,29 +6353,24 @@ void Message::fromNameUpdated(int width) const {
 	}
 	const auto from = displayFrom();
 	validateFromNameText(from);
-	if (const auto via = item->Get<HistoryMessageVia>()) {
-		if (!displayForwardedFrom()) {
-			const auto nameText = [&]() -> const Ui::Text::String * {
-				if (from) {
-					return &_fromName;
-				} else if (const auto info = item->originalHiddenSenderInfo()) {
-					return &info->nameText();
-				} else {
-					Unexpected("Corrupted forwarded information in message.");
-				}
-			}();
-			via->resize(width
-				- st::msgPadding.left()
-				- st::msgPadding.right()
-				- nameText->maxWidth()
-				- (_fromNameStatus
-					? (st::dialogsPremiumIcon.icon.width()
-						+ st::msgServiceFont->spacew)
-					: 0)
-				- st::msgServiceFont->spacew);
-		}
+	const auto via = item->Get<HistoryMessageVia>();
+	const auto guestChat = item->Get<HistoryMessageGuestChat>();
+	if (!via && !guestChat) {
+		return;
 	}
-	if (const auto guestChat = item->Get<HistoryMessageGuestChat>()) {
+	const auto available = width
+		- st::msgPadding.left()
+		- st::msgPadding.right()
+		- (_fromNameStatus
+			? (st::dialogsPremiumIcon.icon.width()
+				+ st::msgServiceFont->spacew)
+			: 0);
+	auto viaWidth = 0;
+	if (via && !displayForwardedFrom()) {
+		via->resize(available - st::msgServiceFont->spacew);
+		viaWidth = st::msgServiceFont->spacew + via->width;
+	}
+	if (guestChat) {
 		const auto nameText = [&]() -> const Ui::Text::String * {
 			if (from) {
 				return &_fromName;
@@ -6462,22 +6380,13 @@ void Message::fromNameUpdated(int width) const {
 				Unexpected("Corrupted forwarded information in message.");
 			}
 		}();
-		auto viaWidth = 0;
-		if (const auto via = item->Get<HistoryMessageVia>()) {
-			if (!displayForwardedFrom()) {
-				viaWidth = st::msgServiceFont->spacew + via->width;
-			}
-		}
-		guestChat->resize(width
-			- st::msgPadding.left()
-			- st::msgPadding.right()
-			- nameText->maxWidth()
-			- (_fromNameStatus
-				? (st::dialogsPremiumIcon.icon.width()
-					+ st::msgServiceFont->spacew)
-				: 0)
-			- st::msgServiceFont->spacew
-			- viaWidth);
+		const auto nameWidth = std::min(
+			nameText->maxWidth(),
+			std::max(available - viaWidth, 0));
+		guestChat->resize(available
+			- viaWidth
+			- nameWidth
+			- st::msgServiceFont->spacew);
 	}
 }
 
@@ -6895,9 +6804,7 @@ int Message::resizeContentGetHeight(int newWidth) {
 		}
 
 		if (item->repliesAreComments() || item->externalReply()) {
-			if (!AyuFeatures::MessageShot::isTakingShot()) {
-				newHeight += st::historyCommentsButtonHeight;
-			}
+			newHeight += st::historyCommentsButtonHeight;
 		} else if (_comments) {
 			_comments = nullptr;
 			checkHeavyPart();
