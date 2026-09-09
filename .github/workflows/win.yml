@@ -14,16 +14,14 @@ jobs:
     steps:
     - name: Prepare directories
       run: |
-        mkdir %userprofile%\TBuild\Libraries\win64
-        mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
-        echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV
-        echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64>>%GITHUB_ENV
+        mkdir %GITHUB_WORKSPACE%\TBuild\Libraries\win64
+        mkdir %GITHUB_WORKSPACE%\TBuild\ThirdParty
 
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
         submodules: recursive
-        path: ${{ github.workspace }}\TBuild\AyuGramDesktop
+        path: TBuild\AyuGramDesktop
 
     - uses: actions/setup-python@v5
       with:
@@ -43,14 +41,14 @@ jobs:
     - name: Prepare cache key
       shell: bash
       run: |
-        PREPARE_HASH=$(sha256sum $TBUILD/AyuGramDesktop/Telegram/build/prepare/prepare.py | awk '{ print $1 }')
+        PREPARE_HASH=$(sha256sum TBuild/AyuGramDesktop/Telegram/build/prepare/prepare.py | awk '{ print $1 }')
         echo "CACHE_KEY=$PREPARE_HASH" >> $GITHUB_ENV
 
     - name: Cache ThirdParty
       id: cache-thirdparty
       uses: actions/cache@v4
       with:
-        path: ${{ env.TBUILD }}\ThirdParty
+        path: TBuild\ThirdParty
         key: thirdparty-win64-${{ env.CACHE_KEY }}
         restore-keys: thirdparty-win64-
 
@@ -58,7 +56,7 @@ jobs:
       id: cache-libs
       uses: actions/cache@v4
       with:
-        path: ${{ env.LibrariesPath }}\*
+        path: TBuild\Libraries
         key: libs-win64-${{ env.CACHE_KEY }}
         restore-keys: libs-win64-
 
@@ -67,26 +65,22 @@ jobs:
       uses: actions/cache@v4
       with:
         path: |
-          ${{ env.LibrariesPath }}\qt*
-          ${{ env.LibrariesPath }}\Qt*
+          TBuild\Libraries\qt*
+          TBuild\Libraries\Qt*
         key: qt-win64-${{ env.CACHE_KEY }}
         restore-keys: qt-win64-
 
     - name: Prepare Libraries
       run: |
-        cd %TBUILD%\AyuGramDesktop\Telegram\build\prepare
+        cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram\build\prepare
         python prepare.py skip-release silent
 
     - name: Configure
       run: |
-        cd %TBUILD%\AyuGramDesktop\Telegram
-        call configure.bat ^
-          x64 ^
-          -D TDESKTOP_API_ID=611335 ^
-          -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c ^
-          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+        cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
+        call configure.bat x64 -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
     - name: Build
       run: |
-        cd %TBUILD%\AyuGramDesktop\Telegram
+        cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
         cmake --build ..\out --config Release --parallel 4
