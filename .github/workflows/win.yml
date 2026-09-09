@@ -38,11 +38,19 @@ jobs:
           submodules: recursive
           path: ${{ env.TBUILD }}\AyuGramDesktop
 
-      - name: Install ATL and build tools
+      - name: Install build tools and ATL
         shell: powershell
         run: |
-          # Install ATL component for breakpad
-          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" modify --installPath "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise" --add Microsoft.VisualStudio.Component.VC.ATL --quiet --wait
+          # Install ATL and build tools
+          $exe = "$env:TEMP\vs_buildtools.exe"
+          Invoke-WebRequest -Uri https://aka.ms/vs/18/stable/vs_buildtools.exe -OutFile $exe
+          $p = Start-Process -FilePath $exe -Wait -PassThru -ArgumentList `
+            '--quiet','--wait','--norestart','--nocache', `
+            '--add','Microsoft.VisualStudio.Workload.VCTools', `
+            '--add','Microsoft.VisualStudio.Component.VC.ATL'
+          Remove-Item $exe -Force -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { exit $p.ExitCode }
+          # Install ninja
           choco install ninja -y
 
       - name: Setup MSVC
@@ -99,13 +107,9 @@ jobs:
 
       - name: Configure and Build
         working-directory: ${{ env.TBUILD }}\AyuGramDesktop\Telegram
-        env:
-          # Reduce memory usage during linking
-          CMAKE_EXE_LINKER_FLAGS: "/LTCG:OFF /OPT:REF /OPT:ICF /DEBUG:NONE /NOLOGO /SAFESEH:NO"
-          CMAKE_CXX_FLAGS: "/Zm200 /Gm- /Gy /GF /GL-"
         run: |
-          call configure.bat -G Ninja -D CMAKE_BUILD_TYPE=Release -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
-          cmake --build ..\out --parallel 1 --target Telegram
+          call configure.bat -G Ninja -D CMAKE_BUILD_TYPE=Release
+          cmake --build ..\out --parallel 2 --target Telegram
 
       - name: Package
         working-directory: ${{ env.TBUILD }}\AyuGramDesktop\out
