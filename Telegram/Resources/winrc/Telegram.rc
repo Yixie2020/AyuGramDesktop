@@ -36,7 +36,7 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_ICON1               ICON                    "..\\art\\icon256.ico"
+IDI_ICON1               ICON                    "..\\art\\ayu\\default\\app_icon.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -60,11 +60,11 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Telegram FZ-LLC"
-            VALUE "FileDescription", "Telegram Desktop"
+            VALUE "CompanyName", "AyuGram"
+            VALUE "FileDescription", "AyuGram Desktop"
             VALUE "FileVersion", "7.2.7.0"
             VALUE "LegalCopyright", "Copyright (C) 2014-2026"
-            VALUE "ProductName", "Telegram Desktop"
+            VALUE "ProductName", "AyuGram Desktop"
             VALUE "ProductVersion", "7.2.7.0"
         END
     END
