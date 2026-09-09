@@ -5,9 +5,13 @@ on:
     branches: [ dev ]
   workflow_dispatch:
 
+concurrency:
+  group: windows-build
+  cancel-in-progress: true
+
 jobs:
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     defaults:
       run:
         shell: cmd
@@ -37,6 +41,7 @@ jobs:
       name: Setup MSVC
       with:
         arch: x64
+        toolset: '14.44'
 
     - name: Prepare cache key
       shell: bash
