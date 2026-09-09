@@ -89,3 +89,10 @@ jobs:
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
         cmake --build ..\out --config Debug --parallel 4
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AyuGram-Windows-x64
+        path: TBuild\AyuGramDesktop\out\Debug\Telegram.exe
+        retention-days: 7
