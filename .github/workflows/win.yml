@@ -78,9 +78,9 @@ jobs:
     - name: Configure
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
-        call configure.bat x64 -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+        call configure.bat x64 -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c -D CMAKE_CONFIGURATION_TYPES=Debug -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
     - name: Build
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
-        cmake --build ..\out --config Release --parallel 4
+        cmake --build ..\out --config Debug --parallel 4
