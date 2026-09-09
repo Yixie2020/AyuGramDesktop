@@ -1,136 +1,81 @@
-name: Windows
+name: Windows x64 Build
 
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - 'v*'
+    branches: [ dev ]
+  workflow_dispatch:
 
-permissions:
-  contents: write
-
-concurrency:
-  group: ayugram-windows-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  UPSTREAM_REPO: https://github.com/AyuGram/AyuGramDesktop
+  UPSTREAM_BRANCH: dev
 
 jobs:
-  build:
-    name: Windows x64
+  build-windows:
     runs-on: windows-latest
-    timeout-minutes: 360
-
-    defaults:
-      run:
-        shell: cmd
-
-    env:
-      TBUILD: ${{ github.workspace }}\TBuild
-
     steps:
-      - name: Prepare directories
-        run: |
-          mkdir %TBUILD%
-          mkdir %TBUILD%\Libraries
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
 
-      - name: Clone sources
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          path: ${{ env.TBUILD }}\AyuGramDesktop
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
 
-      - name: Install build tools and ATL
-        shell: powershell
-        run: |
-          # Install ATL and build tools
-          $exe = "$env:TEMP\vs_buildtools.exe"
-          Invoke-WebRequest -Uri https://aka.ms/vs/18/stable/vs_buildtools.exe -OutFile $exe
-          $p = Start-Process -FilePath $exe -Wait -PassThru -ArgumentList `
-            '--quiet','--wait','--norestart','--nocache', `
-            '--add','Microsoft.VisualStudio.Workload.VCTools', `
-            '--add','Microsoft.VisualStudio.Component.VC.ATL'
-          Remove-Item $exe -Force -ErrorAction SilentlyContinue
-          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { exit $p.ExitCode }
-          # Install ninja
-          choco install ninja -y
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
 
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
+    - uses: dtolnay/rust-toolchain@stable
 
-      # 缓存拆分：每个主要依赖单独缓存，失败后只需重编译出错的部分
-      - name: Restore Qt cache
-        id: cache-qt
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TBUILD }}\Libraries\Qt-6.11.1
-          key: win64-qt-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+    - name: Install ATL
+      run: |
+        # Add ATL component to existing VS Enterprise installation
+        & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add Microsoft.VisualStudio.Component.VC.ATL --quiet --norestart --nocache --wait 2>$null
+        Write-Host "ATL installation attempted"
 
-      - name: Restore OpenSSL cache
-        id: cache-openssl
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TBUILD }}\Libraries\openssl3
-          key: win64-openssl-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+    - name: Cache ThirdParty Libraries
+      id: cache-thirdparty
+      uses: actions/cache@v4
+      with:
+        path: |
+          Telegram/ThirdParty/rlottie
+          Telegram/ThirdParty/libvpx
+          Telegram/ThirdParty/libopus
+        key: thirdparty-win-v1
 
-      - name: Restore FFmpeg cache
-        id: cache-ffmpeg
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TBUILD }}\Libraries\ffmpeg
-          key: win64-ffmpeg-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+    - name: Cache FFmpeg
+      id: cache-ffmpeg
+      uses: actions/cache@v4
+      with:
+        path: Telegram/ThirdParty/ffmpeg
+        key: ffmpeg-win-v1
 
-      - name: Restore tg_owt cache
-        id: cache-tg-owt
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TBUILD }}\Libraries\tg_owt
-          key: win64-tg-owt-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+    - name: Cache OpenAL Soft
+      id: cache-openal
+      uses: actions/cache@v4
+      with:
+        path: Telegram/ThirdParty/openal-soft
+        key: openal-win-v1
 
-      - name: Restore local libs cache
-        id: cache-local
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TBUILD }}\Libraries\local
-          key: win64-local-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+    - name: Cache Qt
+      id: cache-qt
+      uses: actions/cache@v4
+      with:
+        path: Telegram/ThirdParty/qt
+        key: qt-win-v1
 
-      - name: Restore other libs cache
-        id: cache-other
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TBUILD }}\Libraries\win64
-          key: win64-other-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+    - name: Prepare (silent)
+      working-directory: Telegram
+      run: python prepare.py -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c
 
-      - name: Prepare libraries
-        working-directory: ${{ env.TBUILD }}\AyuGramDesktop
-        run: python Telegram\build\prepare\prepare.py silent
+    - name: Configure
+      working-directory: Telegram
+      run: |
+        ./configure.bat -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c
 
-      - name: Configure and Build
-        working-directory: ${{ env.TBUILD }}\AyuGramDesktop\Telegram
-        run: |
-          call configure.bat -G Ninja -D CMAKE_BUILD_TYPE=Release
-          cmake --build ..\out --parallel 2 --target Telegram
-
-      - name: Package
-        working-directory: ${{ env.TBUILD }}\AyuGramDesktop\out
-        run: |
-          mkdir release
-          copy Telegram\AyuGram.exe release\
-          cd release
-          7z a AyuGram.zip AyuGram.exe
-          certutil -hashfile AyuGram.zip SHA256 > AyuGram.zip.sha256
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: AyuGram-win64
-          path: ${{ env.TBUILD }}\AyuGramDesktop\out\release\*
-
-      - name: Upload to release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            ${{ env.TBUILD }}\AyuGramDesktop\out\release\AyuGram.zip
-            ${{ env.TBUILD }}\AyuGramDesktop\out\release\AyuGram.zip.sha256
-          draft: false
+    - name: Build
+      working-directory: Telegram
+      run: |
+        cd build
+        cmake --build . --parallel 4
