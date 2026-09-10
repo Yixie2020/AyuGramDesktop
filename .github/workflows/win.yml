@@ -54,16 +54,16 @@ jobs:
       uses: actions/cache@v4
       with:
         path: TBuild\ThirdParty
-        key: thirdparty-win64-rel-${{ env.CACHE_KEY }}
-        restore-keys: thirdparty-win64-rel-
+        key: thirdparty-win64-${{ env.CACHE_KEY }}
+        restore-keys: thirdparty-win64-
 
     - name: Cache Libraries
       id: cache-libs
       uses: actions/cache@v4
       with:
         path: TBuild\Libraries
-        key: libs-win64-rel-${{ env.CACHE_KEY }}
-        restore-keys: libs-win64-rel-
+        key: libs-win64-${{ env.CACHE_KEY }}
+        restore-keys: libs-win64-
 
     - name: Cache Qt
       id: cache-qt
@@ -72,27 +72,27 @@ jobs:
         path: |
           TBuild\Libraries\qt*
           TBuild\Libraries\Qt*
-        key: qt-win64-rel-${{ env.CACHE_KEY }}
-        restore-keys: qt-win64-rel-
+        key: qt-win64-${{ env.CACHE_KEY }}
+        restore-keys: qt-win64-
 
     - name: Prepare Libraries
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram\build\prepare
-        python prepare.py silent
+        python prepare.py skip-release silent
 
     - name: Configure
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
-        call configure.bat x64 -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c -D CMAKE_CONFIGURATION_TYPES=Release -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON -D CMAKE_DISABLE_PRECOMPILE_HEADERS=ON
+        call configure.bat x64 -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c -D CMAKE_CONFIGURATION_TYPES=Debug -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
     - name: Build
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
-        cmake --build ..\out --config Release --parallel 2
+        cmake --build ..\out --config Debug --parallel 2
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: AyuGram-Windows-x64
-        path: TBuild\AyuGramDesktop\out\Release\AyuGram.exe
+        path: TBuild\AyuGramDesktop\out\Debug\AyuGram.exe
         retention-days: 7
