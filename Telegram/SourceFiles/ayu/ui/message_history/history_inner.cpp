@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2026
 #include "ayu/ui/message_history/history_inner.h"
 
+#include "history/view/media/history_view_gram_transfer.h"
 #include "apiwrap.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
@@ -650,6 +651,15 @@ QString InnerWidget::elementAuthorRank(not_null<const Element*> view) {
 
 bool InnerWidget::elementHideTopicButton(not_null<const Element*> view) {
 	return false;
+}
+
+HistoryView::GramReadLine *InnerWidget::elementGramReadLine() {
+	if (!_gramReadLine) {
+		_gramReadLine = std::make_unique<HistoryView::GramReadLine>([=] {
+			update();
+		});
+	}
+	return _gramReadLine.get();
 }
 
 void InnerWidget::saveState(not_null<SectionMemento*> memento) {

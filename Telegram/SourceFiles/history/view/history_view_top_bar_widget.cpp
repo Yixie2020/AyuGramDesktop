@@ -415,6 +415,13 @@ bool TopBarWidget::createMenu(
 	return true;
 }
 
+void TopBarWidget::closeMenu() {
+	if (_menu) {
+		_menuToggle->setForceRippled(false);
+		_menu = nullptr;
+	}
+}
+
 void TopBarWidget::showPeerMenu() {
 	const auto created = createMenu(_menuToggle);
 	if (!created) {

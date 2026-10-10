@@ -148,6 +148,7 @@ public:
 		HistoryView::Element *replacing) override;
 	QString elementAuthorRank(not_null<const HistoryView::Element*> view) override;
 	bool elementHideTopicButton(not_null<const HistoryView::Element*> view) override;
+	HistoryView::GramReadLine *elementGramReadLine() override;
 
 	~InnerWidget();
 
@@ -272,6 +273,7 @@ private:
 
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
 	std::shared_ptr<Ui::ChatTheme> _theme;
+	std::unique_ptr<HistoryView::GramReadLine> _gramReadLine;
 
 	std::vector<OwnedItem> _items;
 	std::set<uint64> _messageIds;
