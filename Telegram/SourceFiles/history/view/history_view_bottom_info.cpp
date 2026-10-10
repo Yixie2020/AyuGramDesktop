@@ -495,13 +495,15 @@ void BottomInfo::layoutDateText() {
 	const auto editedPrimary = !updated
 		&& (_data.flags & Data::Flag::EditedPrimary)
 		&& !(_data.flags & Data::Flag::ForwardedDate);
-
+	// AyuGram: icon-based or text-based date display
 	if (!settings.replaceBottomInfoWithIcons()) {
 		const auto deleted = (_data.flags & Data::Flag::AyuDeleted)
 			? (settings.deletedMark() + ' ')
 			: QString();
 		const auto edited = editedPrimary
 			? QString()
+			: updated
+			? (tr::lng_ephemeral_updated(tr::now) + ' ')
 			: (_data.flags & Data::Flag::Edited)
 			? (settings.editedMark() + ' ')
 			: (_data.flags & Data::Flag::EstimateDate)
@@ -513,7 +515,8 @@ void BottomInfo::layoutDateText() {
 		const auto prefix = !author.isEmpty() ? u", "_q : QString();
 		const auto date = editedPrimary
 			? FormatEditedDate(_data.date, _data.editedDate)
-			: edited + ((_data.flags & Data::Flag::ForwardedDate)
+			: edited + ((_data.flags
+				& (Data::Flag::ForwardedDate | Data::Flag::FullDate))
 			? Ui::FormatDateTimeSavedFrom(_data.date)
 			: formatMessageTime(_data.date.time()));
 		const auto afterAuthor = prefix + date;
@@ -602,7 +605,8 @@ void BottomInfo::layoutDateText() {
 
 		const auto dateStr = editedPrimary
 			? FormatEditedDate(_data.date, _data.editedDate)
-			: (_data.flags & Data::Flag::ForwardedDate)
+			: (_data.flags
+				& (Data::Flag::ForwardedDate | Data::Flag::FullDate))
 			? Ui::FormatDateTimeSavedFrom(_data.date)
 			: formatMessageTime(_data.date.time());
 
@@ -652,13 +656,7 @@ void BottomInfo::layoutDateText() {
 				.textColor = false,
 			})).append("  ");
 		}
-		marked.append(full);
 
-		_authorEditedDate.setMarkedText(
-			st::msgDateTextStyle,
-			marked,
-			Ui::NameTextOptions(),
-			helper.context());
 	}
 }
 
@@ -790,6 +788,8 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	}
 	if (message->context() == Context::ShortcutMessages) {
 		result.flags |= Flag::Shortcut;
+	} else if (message->context() == Context::MediaEditor) {
+		result.flags |= Flag::FullDate;
 	}
 	if (!item->isPost()
 		|| !item->hasRealFromId()

@@ -913,7 +913,9 @@ void System::showNext() {
 					? nextNotify->item.get()
 					: nullptr;
 				if (nextItem
-					&& qAbs(int64(nextItem->date()) - int64(groupedItem->date())) < 2) {
+					&& std::abs(int64(nextItem->date())
+						- int64(groupedItem->date()))
+						< 2) {
 					if (isForwarded
 						&& groupedItem->author() == nextItem->author()) {
 						++forwardedCount;
@@ -1406,13 +1408,10 @@ Window::SessionController *Manager::openNotificationMessage(
 	}
 	const auto window = separate
 		? separate->sessionController()
-		: openSeparated
-		? [&] {
-			const auto window = Core::App().ensureSeparateWindowFor(
-				separateId,
-				itemId);
-			return window ? window->sessionController() : nullptr;
-		}()
+		: (openSeparated && CanShowSeparateWindow(separateId))
+		? Core::App().ensureSeparateWindowFor(
+			separateId,
+			itemId)->sessionController()
 		: history->session().tryResolveWindow();
 	if (window) {
 		window->widget()->showFromTray();

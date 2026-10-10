@@ -13,6 +13,10 @@ or select a follow-up afterward.
 
 Read these files completely before phase work:
 
+- [Phase effort](../../shared/phase-effort.md) for effort selection and host
+  mappings before assigning phase workers;
+- On Codex, [child completion and recovery](../../shared/codex-delegation.md)
+  for result-driven waits and recovery of stopped agents;
 - `references/pipeline.md` for the authoritative end-to-end runner contract;
 - `references/phase-prompts.md` for exact leaf prompts and retry rules;
 - `.agents/shared/test-loop.md` for the implementation/test state machine;
@@ -91,7 +95,7 @@ Execute `references/pipeline.md` exactly. A normal task produces:
 1. one or more tested Telegram implementation-attempt commits, each with an
    exact one-line subject using the pipeline's conditional `[ai] ` prefix,
    blank line, and `Task: <full-task-id>`;
-2. local tracked phase artifacts and progress in the AI slot worktree, without
+2. local tracked phase artifacts in the AI slot worktree, without
    phase commits;
 3. one canonical `Approve <full-task-id>` commit containing all final AI
    artifacts and state.
