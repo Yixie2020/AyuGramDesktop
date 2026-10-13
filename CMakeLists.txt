@@ -55,6 +55,19 @@ include(cmake/validate_d3d_compiler.cmake)
 include(cmake/target_prepare_qrc.cmake)
 
 include(cmake/options.cmake)
+
+# cmake_helpers' common_options enables /MP (multi-process cl.exe). Several
+# SourceFiles/history TUs exhaust the compiler heap when they compile at once
+# on 7 GB CI runners, so strip it. AyuGram-specific: leave the shared toolkit
+# untouched. Verify /MP is absent from the generated .vcxproj / cl command line.
+if (MSVC)
+    get_target_property(ayugram_common_opts common_options INTERFACE_COMPILE_OPTIONS)
+    if (ayugram_common_opts)
+        list(FILTER ayugram_common_opts EXCLUDE REGEX "^/MP$")
+        set_property(TARGET common_options PROPERTY INTERFACE_COMPILE_OPTIONS "${ayugram_common_opts}")
+    endif()
+endif()
+
 include(cmake/external/qt/package.cmake)
 
 set(desktop_app_skip_libs
