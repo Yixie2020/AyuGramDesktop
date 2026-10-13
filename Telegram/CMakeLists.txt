@@ -2987,3 +2987,31 @@ if (LINUX AND DESKTOP_APP_USE_PACKAGED)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/com.ayugram.desktop.service" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/dbus-1/services")
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/com.ayugram.desktop.metainfo.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")
 endif()
+
+# When precompiled headers are disabled (CMAKE_DISABLE_PRECOMPILE_HEADERS),
+# MSVC loses the /FI that the PCH machinery used to inject into every TU.
+# Those headers are the complete dependency set these targets already compile
+# with, so force-include the same files to keep include completeness without
+# the PCH file mapping (the mapping is what exhausts virtual address space).
+# Windows-only; macOS and Linux builds are untouched.
+if (WIN32 AND MSVC AND CMAKE_DISABLE_PRECOMPILE_HEADERS)
+    function(ayugram_force_include tgt header)
+        target_compile_options(${tgt} PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:/FI${header}>
+        )
+    endfunction()
+    ayugram_force_include(Telegram "${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/stdafx.h")
+    ayugram_force_include(td_lang "${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/lang/lang_pch.h")
+    ayugram_force_include(td_mtproto "${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/mtproto/mtproto_pch.h")
+    ayugram_force_include(td_gram "${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/gram/gram_pch.h")
+    ayugram_force_include(td_export "${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/export/export_pch.h")
+    ayugram_force_include(td_ui "${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/ui/ui_pch.h")
+    ayugram_force_include(td_iv "${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/iv/iv_pch.h")
+    ayugram_force_include(lib_stripe "${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/payments/stripe/stripe_pch.h")
+    ayugram_force_include(lib_base "${CMAKE_CURRENT_SOURCE_DIR}/lib_base/base/base_pch.h")
+    ayugram_force_include(lib_base_crash_report_writer "${CMAKE_CURRENT_SOURCE_DIR}/lib_base/base/base_pch.h")
+    ayugram_force_include(lib_ui "${CMAKE_CURRENT_SOURCE_DIR}/lib_ui/ui/ui_pch.h")
+    ayugram_force_include(lib_webrtc "${CMAKE_CURRENT_SOURCE_DIR}/lib_webrtc/webrtc/webrtc_pch.h")
+    ayugram_force_include(lib_storage "${CMAKE_CURRENT_SOURCE_DIR}/lib_storage/storage/storage_pch.h")
+    ayugram_force_include(lib_spellcheck "${CMAKE_CURRENT_SOURCE_DIR}/lib_spellcheck/spellcheck/spellcheck_pch.h")
+endif()
