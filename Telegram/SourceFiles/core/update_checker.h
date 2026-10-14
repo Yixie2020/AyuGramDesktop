@@ -29,6 +29,11 @@ public:
 	};
 	using Progress = MTP::AbstractDedicatedLoader::Progress;
 
+	// AyuGram: announce-only, the UI opens the Release page and never installs.
+	struct Available {
+		QString url;
+	};
+
 	UpdateChecker();
 
 	rpl::producer<> checking() const;
@@ -36,6 +41,7 @@ public:
 	rpl::producer<Progress> progress() const;
 	rpl::producer<> failed() const;
 	rpl::producer<> ready() const;
+	rpl::producer<Available> available() const;
 
 	void start(bool forceWait = false);
 	void stop();

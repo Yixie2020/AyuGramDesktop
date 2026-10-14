@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/connection_box.h"
 #include "boxes/download_path_box.h"
 #include "core/application.h"
+#include "core/click_handler_types.h"
 #include "core/core_settings.h"
 #include "core/file_utilities.h"
 #include "core/launcher.h"
@@ -1206,6 +1207,14 @@ void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 			}, toggle->lifetime());
 		}
 
+		const auto installAndRestart = [] {
+			if (!Core::UpdaterDisabled()) {
+				Core::checkReadyUpdate();
+			}
+			Core::Restart();
+		};
+		update->setClickedCallback(installAndRestart);
+
 		Core::UpdateChecker checker;
 
 		checker.checking() | rpl::on_next([=] {
@@ -1230,21 +1239,24 @@ void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 			texts->fire(tr::lng_settings_update_fail(tr::now));
 			downloading->fire(false);
 		}, options->lifetime());
+		checker.available() | rpl::on_next([=](Core::UpdateChecker::Available info) {
+			options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+			texts->fire(tr::ayu_SettingsUpdateAvailable(tr::now));
+			update->show();
+			update->setClickedCallback([=] {
+				UrlClickHandler::Open(info.url);
+			});
+			downloading->fire(false);
+		}, options->lifetime());
 		checker.ready() | rpl::on_next([=] {
 			options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
 			texts->fire(tr::lng_settings_update_ready(tr::now));
 			update->show();
+			update->setClickedCallback(installAndRestart);
 			downloading->fire(false);
 		}, options->lifetime());
 
 		setDefaultStatus(checker);
-
-		update->setClickedCallback([] {
-			if (!Core::UpdaterDisabled()) {
-				Core::checkReadyUpdate();
-			}
-			Core::Restart();
-		});
 	}
 
 	builder.addSkip();
@@ -1563,6 +1575,14 @@ void SetupUpdate(not_null<Ui::VerticalLayout*> container) {
 		}, toggle->lifetime());
 	}
 
+	const auto installAndRestart = [] {
+		if (!Core::UpdaterDisabled()) {
+			Core::checkReadyUpdate();
+		}
+		Core::Restart();
+	};
+	update->setClickedCallback(installAndRestart);
+
 	Core::UpdateChecker checker;
 	options->toggleOn(rpl::combine(
 		toggle->toggledValue(),
@@ -1594,10 +1614,20 @@ void SetupUpdate(not_null<Ui::VerticalLayout*> container) {
 		texts->fire(tr::lng_settings_update_fail(tr::now));
 		downloading->fire(false);
 	}, options->lifetime());
+	checker.available() | rpl::on_next([=](Core::UpdateChecker::Available info) {
+		options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+		texts->fire(tr::ayu_SettingsUpdateAvailable(tr::now));
+		update->show();
+		update->setClickedCallback([=] {
+			UrlClickHandler::Open(info.url);
+		});
+		downloading->fire(false);
+	}, options->lifetime());
 	checker.ready() | rpl::on_next([=] {
 		options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
 		texts->fire(tr::lng_settings_update_ready(tr::now));
 		update->show();
+		update->setClickedCallback(installAndRestart);
 		downloading->fire(false);
 	}, options->lifetime());
 
@@ -1608,12 +1638,6 @@ void SetupUpdate(not_null<Ui::VerticalLayout*> container) {
 
 		cSetLastUpdateCheck(0);
 		checker.start();
-	});
-	update->addClickHandler([] {
-		if (!Core::UpdaterDisabled()) {
-			Core::checkReadyUpdate();
-		}
-		Core::Restart();
 	});
 }
 

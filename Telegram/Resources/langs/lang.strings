@@ -9600,5 +9600,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ConfirmationRound" = "Do you want to send this round video?";
 "ayu_IntroAbout" = "Welcome to the AyuGram Desktop.\nMake Telegram your own.";
 "ayu_AboutText1" = "ToS breaking Telegram client based on {api_link}.";
+"ayu_SettingsUpdateAvailable" = "New version is available";
 "ayu_UpdateAyuGram" = "Update AyuGram";
 "ayu_UtilityRestartRequired" = "The app will close in 5 seconds.";

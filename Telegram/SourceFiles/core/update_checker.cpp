@@ -63,6 +63,8 @@ extern "C" {
 namespace Core {
 namespace {
 
+using Available = UpdateChecker::Available;
+
 constexpr auto kUpdaterTimeout = 10 * crl::time(1000);
 constexpr auto kMaxResponseSize = 1024 * 1024;
 
@@ -129,6 +131,7 @@ public:
 
 	rpl::producer<std::shared_ptr<Loader>> ready() const;
 	rpl::producer<> failed() const;
+	rpl::producer<QString> available() const;
 
 	rpl::lifetime &lifetime();
 
@@ -138,11 +141,13 @@ protected:
 	bool testing() const;
 	void done(std::shared_ptr<Loader> result);
 	void fail();
+	void announce(QString url);
 
 private:
 	bool _testing = false;
 	rpl::event_stream<std::shared_ptr<Loader>> _ready;
 	rpl::event_stream<> _failed;
+	rpl::event_stream<QString> _available;
 
 	rpl::lifetime _lifetime;
 
@@ -151,6 +156,7 @@ private:
 struct Implementation {
 	std::unique_ptr<Checker> checker;
 	std::shared_ptr<Loader> loader;
+	QString availableUrl;
 	bool failed = false;
 
 };
@@ -171,6 +177,8 @@ private:
 	std::optional<QString> parseOldResponse(
 		const QByteArray &response) const;
 	std::optional<QString> parseResponse(const QByteArray &response) const;
+	std::optional<QString> parseReleaseResponse(
+		const QByteArray &response) const;
 	QString validateLatestUrl(
 		uint64 availableVersion,
 		bool isAvailableAlpha,
@@ -708,6 +716,10 @@ rpl::producer<> Checker::failed() const {
 	return _failed.events();
 }
 
+rpl::producer<QString> Checker::available() const {
+	return _available.events();
+}
+
 bool Checker::poll() const {
 	return true;
 }
@@ -724,6 +736,10 @@ void Checker::fail() {
 	_failed.fire({});
 }
 
+void Checker::announce(QString url) {
+	_available.fire(std::move(url));
+}
+
 rpl::lifetime &Checker::lifetime() {
 	return _lifetime;
 }
@@ -732,14 +748,15 @@ HttpChecker::HttpChecker(bool testing) : Checker(testing) {
 }
 
 void HttpChecker::start() {
-	const auto updaterVersion = Platform::AutoUpdateVersion();
-	const auto path = Local::readAutoupdatePrefix()
-		+ qstr("/current")
-		+ (updaterVersion > 1 ? QString::number(updaterVersion) : QString());
-	auto url = QUrl(path);
-	DEBUG_LOG(("Update Info: requesting update state"));
-	auto request = QNetworkRequest(url);
+	// WHY: our Releases are the only place a new build is ever published, so
+	// ask GitHub instead of the old autoupdate prefix. We cannot sign a v2
+	// update package, so this stays announce-only and never installs anything.
+	auto request = QNetworkRequest(
+		QUrl(qstr("https://api.github.com/repos/Yixie2020/AyuGramDesktop/releases/latest")));
 	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+	request.setRawHeader("Accept", "application/vnd.github+json");
+	request.setRawHeader("User-Agent", "AyuGram-Update-Checker");
+	DEBUG_LOG(("Update Info: requesting update state"));
 	_manager = std::make_unique<QNetworkAccessManager>();
 	_reply = _manager->get(request);
 	_reply->connect(_reply, &QNetworkReply::finished, [=] {
@@ -766,6 +783,14 @@ void HttpChecker::gotResponse() {
 }
 
 bool HttpChecker::handleResponse(const QByteArray &response) {
+	if (const auto url = parseReleaseResponse(response)) {
+		// announce() before done(), the subscriber stores the url first.
+		if (!url->isEmpty()) {
+			announce(*url);
+		}
+		done(nullptr);
+		return true;
+	}
 	const auto handle = [&](const QString &url) {
 		done(url.isEmpty() ? nullptr : std::make_shared<HttpLoader>(url));
 		return true;
@@ -850,6 +875,30 @@ std::optional<QString> HttpChecker::parseResponse(
 		bestAvailableVersion,
 		bestIsAvailableAlpha,
 		Local::readAutoupdatePrefix() + bestLink);
+}
+
+std::optional<QString> HttpChecker::parseReleaseResponse(
+		const QByteArray &response) const {
+	const auto parsed = QJsonDocument::fromJson(response);
+	if (!parsed.isObject()) {
+		return std::nullopt;
+	}
+	const auto object = parsed.object();
+	const auto tag = object.constFind("tag_name");
+	const auto html = object.constFind("html_url");
+	if (tag == object.constEnd() || !(*tag).isString()
+		|| html == object.constEnd() || !(*html).isString()) {
+		return std::nullopt;
+	}
+	auto version = (*tag).toString();
+	if (version.startsWith(qstr("v")) || version.startsWith(qstr("V"))) {
+		version = version.mid(1);
+	}
+	const auto parts = version.split('.');
+	const auto available = parts.value(0).toULongLong() * 1000000
+		+ parts.value(1).toULongLong() * 1000
+		+ parts.value(2).toULongLong();
+	return validateLatestUrl(available, false, (*html).toString());
 }
 
 QString HttpChecker::validateLatestUrl(
@@ -1516,6 +1565,7 @@ public:
 	rpl::producer<Progress> progress() const;
 	rpl::producer<> failed() const;
 	rpl::producer<> ready() const;
+	rpl::producer<Available> available() const;
 
 	void start(bool forceWait);
 	void stop();
@@ -1556,6 +1606,7 @@ private:
 	void handleLatest();
 	void handleFailed();
 	void handleReady();
+	void handleAvailable();
 	void scheduleNext();
 
 	bool _testing = false;
@@ -1567,6 +1618,7 @@ private:
 	rpl::event_stream<Progress> _progress;
 	rpl::event_stream<> _failed;
 	rpl::event_stream<> _ready;
+	rpl::event_stream<Available> _available;
 	Implementation _httpImplementation;
 	Implementation _mtpImplementation;
 	Implementation _flatpakImplementation;
@@ -1596,6 +1648,9 @@ Updater::Updater()
 	isLatest() | rpl::on_next([=] {
 		handleLatest();
 	}, _lifetime);
+	available() | rpl::on_next([=] {
+		handleAvailable();
+	}, _lifetime);
 }
 
 rpl::producer<> Updater::checking() const {
@@ -1619,6 +1674,10 @@ rpl::producer<> Updater::ready() const {
 	return _ready.events();
 }
 
+rpl::producer<Available> Updater::available() const {
+	return _available.events();
+}
+
 void Updater::check() {
 	start(false);
 }
@@ -1640,6 +1699,10 @@ void Updater::handleLatest() {
 	if (const auto update = FindUpdateFile(); !update.isEmpty()) {
 		QFile(update).remove();
 	}
+	scheduleNext();
+}
+
+void Updater::handleAvailable() {
 	scheduleNext();
 }
 
@@ -1769,6 +1832,10 @@ void Updater::startImplementation(
 	) | rpl::on_next([=] {
 		checkerFail(which);
 	}, checker->lifetime());
+	checker->available(
+	) | rpl::on_next([=](QString &&url) {
+		which->availableUrl = std::move(url);
+	}, checker->lifetime());
 
 	*which = Implementation{ std::move(checker) };
 
@@ -1847,6 +1914,8 @@ bool Updater::tryLoaders() {
 			_retryTimer.callOnce(kUpdaterTimeout);
 			loader->wipeFolder();
 			loader->start();
+		} else if (!which.availableUrl.isEmpty()) {
+			_available.fire({ which.availableUrl });
 		} else {
 			_isLatest.fire({});
 		}
@@ -1930,6 +1999,10 @@ rpl::producer<> UpdateChecker::failed() const {
 
 rpl::producer<> UpdateChecker::ready() const {
 	return _updater->ready();
+}
+
+rpl::producer<UpdateChecker::Available> UpdateChecker::available() const {
+	return _updater->available();
 }
 
 void UpdateChecker::start(bool forceWait) {
