@@ -4315,7 +4315,7 @@ void ApiWrap::sendVoiceMessage(
 		bool video,
 		const SendAction &action) {
 	auto scheduledAction = action;
-	applyGhostScheduling(_session, scheduledAction.options, 17);
+	applyGhostScheduling(scheduledAction, QString(), 17);
 	const auto caption = TextWithTags();
 	const auto to = FileLoadTaskOptions(scheduledAction);
 	_fileLoader->addTask(
@@ -4567,12 +4567,14 @@ void ApiWrap::sendRichMessage(
 
 	const auto history = action.history;
 	const auto peer = history->peer;
+	const auto summary = Iv::FlattenRichPageSummary(page).text;
+	applyGhostScheduling(action, summary);
 	const auto ephemeral = !action.options.scheduled
 		&& !action.options.shortcutId
 		&& _session->ephemeralMessages().wouldSendMedia(
 			peer,
 			action.replyTo,
-			Iv::FlattenRichPageSummary(page).text);
+			summary);
 	if (!ephemeral) {
 		StripEphemeralReply(_session, action.replyTo);
 	}
@@ -4818,7 +4820,7 @@ void ApiWrap::sendRichMessage(
 void ApiWrap::sendMessage(
 		MessageToSend &&message,
 		std::optional<MsgId> localMessageId) {
-	applyGhostScheduling(_session, message.action.options);
+	applyGhostScheduling(message.action, message.textWithTags.text);
 	const auto clearReplyTo = prependPseudoReply(message);
 
 	const auto history = message.action.history;
