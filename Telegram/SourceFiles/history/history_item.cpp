@@ -3081,6 +3081,8 @@ void HistoryItem::clearMediaAsExpired() {
 	const auto media = this->media();
 	if (!media || !media->ttlSeconds()) {
 		return;
+	} else if (isIncomingUnreadMedia()) {
+		return;
 	}
 	unarmMediaDestroy();
 	const auto &settings = AyuSettings::getInstance();

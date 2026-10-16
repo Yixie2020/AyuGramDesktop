@@ -1454,6 +1454,7 @@ void ApiWrap::migrateFail(not_null<PeerData*> peer, const QString &error) {
 
 void ApiWrap::markContentsRead(
 		const base::flat_set<not_null<HistoryItem*>> &items) {
+	const auto &settings = AyuSettings::getInstance();
 	const auto &ghost = AyuSettings::ghost(&session());
 
 	auto markedIds = QVector<MTPint>();
@@ -1463,8 +1464,12 @@ void ApiWrap::markContentsRead(
 	markedIds.reserve(items.size());
 	for (const auto &item : items) {
 		const auto passthrough = (item->isUnreadMention() || item->hasUnreadReaction()) && !item->isUnreadMedia();
+		const auto keepUnread = settings.saveDeletedMessages()
+			&& item->isIncomingUnreadMedia()
+			&& item->media()->ttlSeconds();
 
-		if (!item->markContentsRead(true) || !item->isRegular()) {
+		if ((!keepUnread && !item->markContentsRead(true))
+			|| !item->isRegular()) {
 			continue;
 		}
 
@@ -1495,8 +1500,12 @@ void ApiWrap::markContentsRead(
 
 void ApiWrap::markContentsRead(not_null<HistoryItem*> item) {
 	const auto passthrough = (item->isUnreadMention() || item->hasUnreadReaction()) && !item->isUnreadMedia();
+	const auto keepUnread = AyuSettings::getInstance().saveDeletedMessages()
+		&& item->isIncomingUnreadMedia()
+		&& item->media()->ttlSeconds();
 
-	if (!item->markContentsRead(true) || !item->isRegular()) {
+	if ((!keepUnread && !item->markContentsRead(true))
+		|| !item->isRegular()) {
 		return;
 	}
 
