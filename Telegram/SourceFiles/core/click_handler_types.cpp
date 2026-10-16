@@ -49,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/ayu_url_handlers.h"
 
 #include <ada.h>
 
@@ -457,8 +458,10 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 			|| (confirmAfterIvFallback && !canTryIv)
 			|| (HiddenUrlRequiresConfirmation(parsedUrl)
 				&& !skipConfirmation);
-		if (!AyuSettings::getInstance().disableOpenLinkWarning()
-			&& requiresConfirmation) {
+		const auto skipWarning
+			= AyuSettings::getInstance().disableOpenLinkWarning()
+			&& AyuUrlHandlers::IsWebUrl(parsedUrl);
+		if (!skipWarning && requiresConfirmation) {
 			if (!my.show) {
 				Core::App().hideMediaView();
 			}

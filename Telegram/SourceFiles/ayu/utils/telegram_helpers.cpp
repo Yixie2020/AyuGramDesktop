@@ -423,7 +423,14 @@ void readHistory(not_null<HistoryItem*> message) {
 							 return history->session().api().request(MTPchannels_ReadHistory(
 								 channel->inputChannel(),
 								 MTP_int(tillId)
-							 )).done([=] { AyuWorker::markAsOnline(&history->session()); }).send();
+							 )).done([=]
+							 {
+								 AyuWorker::markAsOnline(&history->session());
+								 finish();
+							 }).fail([=]
+							 {
+								 finish();
+							 }).send();
 						 }
 
 						 return history->session().api().request(MTPmessages_ReadHistory(
@@ -433,8 +440,10 @@ void readHistory(not_null<HistoryItem*> message) {
 						 {
 							 history->session().api().applyAffectedMessages(history->peer, result);
 							 AyuWorker::markAsOnline(&history->session());
+							 finish();
 						 }).fail([=]
 						 {
+							 finish();
 						 }).send();
 					 });
 
