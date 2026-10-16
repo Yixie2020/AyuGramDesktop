@@ -1109,10 +1109,8 @@ MediaCheckResult CheckMessageMedia(const MTPMessageMedia &media) {
 				? Result::HasExpiredMediaTimeToLive
 				: Result::Empty;
 		}
-		return photo->match([&](const MTPDphoto &) {
-			return data.vttl_seconds()
-				? Result::HasUnsupportedTimeToLive
-				: Result::Good;
+		return photo->match([](const MTPDphoto &) {
+			return Result::Good;
 		}, [&](const MTPDphotoEmpty &) {
 			return data.vttl_seconds()
 				? Result::HasExpiredMediaTimeToLive
@@ -1125,10 +1123,8 @@ MediaCheckResult CheckMessageMedia(const MTPMessageMedia &media) {
 				? Result::HasExpiredMediaTimeToLive
 				: Result::Empty;
 		}
-		return document->match([&](const MTPDdocument &) {
-			return (data.vttl_seconds() && data.is_video())
-				? Result::HasUnsupportedTimeToLive
-				: Result::Good;
+		return document->match([](const MTPDdocument &) {
+			return Result::Good;
 		}, [&](const MTPDdocumentEmpty &) {
 			return data.vttl_seconds()
 				? Result::HasExpiredMediaTimeToLive
