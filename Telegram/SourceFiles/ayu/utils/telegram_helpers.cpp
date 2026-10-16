@@ -456,14 +456,6 @@ void markReadAfterAction(not_null<History*> history) {
 	}
 }
 
-QString formatTTL(int time, bool isDoc) {
-	if (time == 0x7FFFFFFF) {
-		return isDoc ? tr::ayu_OnePlayTTL(tr::now) : tr::ayu_OneViewTTL(tr::now);
-	}
-
-	return QString("%1s").arg(time);
-}
-
 QString getDCName(int dc) {
 	const auto getName = [=]
 	{

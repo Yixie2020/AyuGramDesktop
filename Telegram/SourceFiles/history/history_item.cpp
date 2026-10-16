@@ -117,6 +117,9 @@ template <typename T>
 [[nodiscard]] bool ShowTtlMediaAsExpired(
 		not_null<HistoryItem*> item,
 		const MTPMessageMedia &media) {
+	if (AyuSettings::getInstance().saveDeletedMessages()) {
+		return false;
+	}
 	if (item->out() || item->hasUnreadMediaFlag()) {
 		return false;
 	}
@@ -600,36 +603,9 @@ HistoryItem::HistoryItem(
 		setReactions(data.vreactions());
 		applyTTL(data);
 	} else {
-		auto skipSetText = false;
 		createComponents(data);
-		if (media) {
+		if (const auto media = data.vmedia()) {
 			setMedia(*media);
-			if (checked == MediaCheckResult::HasUnsupportedTimeToLive) {
-				media->match(
-					[&](const MTPDmessageMediaPhoto &media)
-					{
-						if (!data.is_media_unread()) {
-							createServiceFromMtp(data);
-							skipSetText = true;
-						}
-
-						const auto time = media.vttl_seconds()->v;
-						setAyuHint(formatTTL(time, false));
-						_unsupportedTTL = time;
-					},
-					[&](const MTPDmessageMediaDocument &media)
-					{
-						if (!data.is_media_unread()) {
-							createServiceFromMtp(data);
-							skipSetText = true;
-						}
-
-						const auto time = media.vttl_seconds()->v;
-						setAyuHint(formatTTL(time, true));
-						_unsupportedTTL = time;
-					},
-					[](const auto &) {});
-			}
 		}
 		if (const auto media = _media.get()) {
 			if (media->ttlSeconds()
@@ -646,7 +622,7 @@ HistoryItem::HistoryItem(
 			const auto richPage = Iv::ParseRichPage(&history->session(), *richMessage);
 			setRichPage(richPage);
 			setText(Iv::FlattenRichPageSummary(richPage));
-		} else if (!skipSetText) {
+		} else {
 			auto textWithEntities = TextWithEntities{
 				qs(data.vmessage()),
 				Api::EntitiesFromMTP(
@@ -2014,7 +1990,7 @@ bool HistoryItem::markContentsRead(bool fromThisClient) {
 		markReactionsRead();
 		result = true;
 	}
-	if (isUnreadMention() || isIncomingUnreadMedia() || (unsupportedTTL() && hasUnreadMediaFlag())) {
+	if (isUnreadMention() || isIncomingUnreadMedia()) {
 		markMediaAndMentionRead();
 		result = true;
 	}
@@ -4369,7 +4345,7 @@ bool HistoryItem::isDeleted() const {
 }
 
 bool HistoryItem::isBurnt() const {
-	return ((media() && media()->ttlSeconds()) || unsupportedTTL()) && !hasUnreadMediaFlag();
+	return media() && media()->ttlSeconds() && !hasUnreadMediaFlag();
 }
 
 bool HistoryItem::wasDeletedAnimated() const {
