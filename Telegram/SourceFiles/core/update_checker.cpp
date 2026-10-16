@@ -895,10 +895,15 @@ std::optional<QString> HttpChecker::parseReleaseResponse(
 		version = version.mid(1);
 	}
 	const auto parts = version.split('.');
-	const auto available = parts.value(0).toULongLong() * 1000000
+	const auto available = (parts.value(0).toULongLong() * 1000000
 		+ parts.value(1).toULongLong() * 1000
-		+ parts.value(2).toULongLong();
-	return validateLatestUrl(available, false, (*html).toString());
+		+ parts.value(2).toULongLong()) * 1000
+		+ parts.value(3).toULongLong();
+	const auto mine = uint64(AppVersion) * 1000 + AppVersionTweak;
+	if (available <= mine) {
+		return QString();
+	}
+	return (*html).toString();
 }
 
 QString HttpChecker::validateLatestUrl(
