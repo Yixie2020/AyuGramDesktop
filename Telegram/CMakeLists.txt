@@ -776,6 +776,7 @@ PRIVATE
     core/update_unpack.h
     core/update_verify.cpp
     core/update_verify.h
+    core/update_version.h
     core/utils.cpp
     core/utils.h
     core/version.h

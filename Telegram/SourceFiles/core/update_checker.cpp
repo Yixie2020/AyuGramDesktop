@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_keys.h"
 #include "core/update_unpack.h"
 #include "core/update_verify.h"
+#include "core/update_version.h"
 #include "core/version.h"
 #include "data/data_channel.h"
 #include "data/data_session.h"
@@ -890,17 +891,9 @@ std::optional<QString> HttpChecker::parseReleaseResponse(
 		|| html == object.constEnd() || !(*html).isString()) {
 		return std::nullopt;
 	}
-	auto version = (*tag).toString();
-	if (version.startsWith(qstr("v")) || version.startsWith(qstr("V"))) {
-		version = version.mid(1);
-	}
-	const auto parts = version.split('.');
-	const auto available = (parts.value(0).toULongLong() * 1000000
-		+ parts.value(1).toULongLong() * 1000
-		+ parts.value(2).toULongLong()) * 1000
-		+ parts.value(3).toULongLong();
-	const auto mine = uint64(AppVersion) * 1000 + AppVersionTweak;
-	if (available <= mine) {
+	const auto available = ParseReleaseVersion((*tag).toString());
+	const auto mine = ParseReleaseVersion(QString::fromLatin1(AppVersionStr));
+	if (!(available > mine)) {
 		return QString();
 	}
 	return (*html).toString();

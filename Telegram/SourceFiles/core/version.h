@@ -23,7 +23,6 @@ constexpr auto AppNameOld = "AyuGram for Windows"_cs;
 constexpr auto AppName = "AyuGram Desktop"_cs;
 constexpr auto AppFile = "AyuGram"_cs;
 constexpr auto AppVersion = 7003001;
-constexpr auto AppVersionTweak = 1;
 constexpr auto AppVersionStr = "7.3.1.1";
 constexpr auto AppBetaVersion = false;
 constexpr auto AppAlphaVersion = TDESKTOP_ALPHA_VERSION;
