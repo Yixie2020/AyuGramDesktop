@@ -656,7 +656,13 @@ void BottomInfo::layoutDateText() {
 				.textColor = false,
 			})).append("  ");
 		}
+		marked.append(full);
 
+		_authorEditedDate.setMarkedText(
+			st::msgDateTextStyle,
+			marked,
+			Ui::NameTextOptions(),
+			helper.context());
 	}
 }
 
