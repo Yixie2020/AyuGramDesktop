@@ -7,6 +7,7 @@
 #include "ayu/ui/components/avatar_corners_preview.h"
 
 #include "apiwrap.h"
+#include "data/data_chat_participant_status.h"
 #include "data/data_peer.h"
 #include "data/data_peer_id.h"
 #include "data/data_session.h"
