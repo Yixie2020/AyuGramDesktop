@@ -29,9 +29,12 @@ public:
 	};
 	using Progress = MTP::AbstractDedicatedLoader::Progress;
 
-	// AyuGram: announce-only, the UI opens the Release page and never installs.
+	// AyuGram: the UI offers an in-app asset download; url opens the
+	// Release page as fallback when no asset matches this platform.
 	struct Available {
 		QString url;
+		QString assetUrl;
+		QString assetName;
 	};
 
 	UpdateChecker();

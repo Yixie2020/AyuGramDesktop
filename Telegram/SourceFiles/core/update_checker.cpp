@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/update_checker.h"
 
+#include <QtCore/QJsonArray>
+
 #include "platform/platform_specific.h"
 #include "base/platform/base_platform_info.h"
 #include "base/platform/base_platform_file_utilities.h"
@@ -132,7 +134,7 @@ public:
 
 	rpl::producer<std::shared_ptr<Loader>> ready() const;
 	rpl::producer<> failed() const;
-	rpl::producer<QString> available() const;
+	rpl::producer<Available> available() const;
 
 	rpl::lifetime &lifetime();
 
@@ -142,13 +144,13 @@ protected:
 	bool testing() const;
 	void done(std::shared_ptr<Loader> result);
 	void fail();
-	void announce(QString url);
+	void announce(const Available &info);
 
 private:
 	bool _testing = false;
 	rpl::event_stream<std::shared_ptr<Loader>> _ready;
 	rpl::event_stream<> _failed;
-	rpl::event_stream<QString> _available;
+	rpl::event_stream<Available> _available;
 
 	rpl::lifetime _lifetime;
 
@@ -157,7 +159,7 @@ private:
 struct Implementation {
 	std::unique_ptr<Checker> checker;
 	std::shared_ptr<Loader> loader;
-	QString availableUrl;
+	Available availableInfo;
 	bool failed = false;
 
 };
@@ -178,7 +180,7 @@ private:
 	std::optional<QString> parseOldResponse(
 		const QByteArray &response) const;
 	std::optional<QString> parseResponse(const QByteArray &response) const;
-	std::optional<QString> parseReleaseResponse(
+	std::optional<Available> parseReleaseResponse(
 		const QByteArray &response) const;
 	QString validateLatestUrl(
 		uint64 availableVersion,
@@ -717,7 +719,7 @@ rpl::producer<> Checker::failed() const {
 	return _failed.events();
 }
 
-rpl::producer<QString> Checker::available() const {
+rpl::producer<Available> Checker::available() const {
 	return _available.events();
 }
 
@@ -737,8 +739,9 @@ void Checker::fail() {
 	_failed.fire({});
 }
 
-void Checker::announce(QString url) {
-	_available.fire(std::move(url));
+void Checker::announce(const Available &info) {
+	auto copy = info;
+	_available.fire(std::move(copy));
 }
 
 rpl::lifetime &Checker::lifetime() {
@@ -801,10 +804,10 @@ void HttpChecker::gotResponse() {
 }
 
 bool HttpChecker::handleResponse(const QByteArray &response) {
-	if (const auto url = parseReleaseResponse(response)) {
+	if (const auto info = parseReleaseResponse(response)) {
 		// announce() before done(), the subscriber stores the url first.
-		if (!url->isEmpty()) {
-			announce(*url);
+		if (!info->url.isEmpty()) {
+			announce(*info);
 		}
 		done(nullptr);
 		return true;
@@ -900,7 +903,7 @@ std::optional<QString> HttpChecker::parseResponse(
 		Local::readAutoupdatePrefix() + bestLink);
 }
 
-std::optional<QString> HttpChecker::parseReleaseResponse(
+std::optional<Available> HttpChecker::parseReleaseResponse(
 		const QByteArray &response) const {
 	const auto parsed = QJsonDocument::fromJson(response);
 	if (!parsed.isObject()) {
@@ -916,9 +919,33 @@ std::optional<QString> HttpChecker::parseReleaseResponse(
 	const auto available = ParseReleaseVersion((*tag).toString());
 	const auto mine = ParseReleaseVersion(QString::fromLatin1(AppVersionStr));
 	if (!(available > mine)) {
-		return QString();
+		return Available();
 	}
-	return (*html).toString();
+	auto result = Available();
+	result.url = (*html).toString();
+	const auto assets = object.constFind("assets");
+	if (assets != object.constEnd() && (*assets).isArray()) {
+		for (const auto &item : (*assets).toArray()) {
+			const auto entry = item.toObject();
+			const auto name = entry.value("name").toString();
+			const auto link = entry.value("browser_download_url").toString();
+			const auto matches = [&] {
+#ifdef Q_OS_MAC
+				return name.endsWith(u".dmg"_q);
+#elif defined(Q_OS_WIN)
+				return name.contains(u"Windows-x64.zip"_q);
+#else // Q_OS_WIN
+				return false;
+#endif // Q_OS_WIN
+			}();
+			if (matches && !link.isEmpty()) {
+				result.assetUrl = link;
+				result.assetName = name;
+				break;
+			}
+		}
+	}
+	return result;
 }
 
 QString HttpChecker::validateLatestUrl(
@@ -1853,8 +1880,8 @@ void Updater::startImplementation(
 		checkerFail(which);
 	}, checker->lifetime());
 	checker->available(
-	) | rpl::on_next([=](QString &&url) {
-		which->availableUrl = std::move(url);
+	) | rpl::on_next([=](Available &&info) {
+		which->availableInfo = std::move(info);
 	}, checker->lifetime());
 
 	*which = Implementation{ std::move(checker) };
@@ -1934,8 +1961,9 @@ bool Updater::tryLoaders() {
 			_retryTimer.callOnce(kUpdaterTimeout);
 			loader->wipeFolder();
 			loader->start();
-		} else if (!which.availableUrl.isEmpty()) {
-			_available.fire({ which.availableUrl });
+		} else if (!which.availableInfo.url.isEmpty()) {
+			auto info = which.availableInfo;
+			_available.fire(std::move(info));
 		} else {
 			_isLatest.fire({});
 		}

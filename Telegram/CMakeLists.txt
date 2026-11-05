@@ -777,6 +777,8 @@ PRIVATE
     core/ui_integration.cpp
     core/ui_integration.h
     core/update_channel.h
+    core/update_asset.cpp
+    core/update_asset.h
     core/update_checker.cpp
     core/update_checker.h
     core/update_keys.cpp

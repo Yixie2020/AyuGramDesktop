@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_utilities.h"
 #include "core/launcher.h"
 #include "core/update_channel.h"
+#include "core/update_asset.h"
 #include "core/update_checker.h"
 #include "data/data_auto_download.h"
 #include "data/data_session.h"
@@ -1117,6 +1118,71 @@ void SubscribeToUpdateChecker(
 	}, options->lifetime());
 }
 
+struct AyuInstallState {
+	Core::UpdateAssetDownload download;
+	QString readyFile;
+};
+
+void SetupAyuAssetInstall(
+		const Core::UpdateChecker::Available &info,
+		not_null<Ui::SlideWrap<Ui::VerticalLayout>*> options,
+		not_null<rpl::event_stream<QString>*> texts,
+		not_null<rpl::event_stream<bool>*> downloading,
+		not_null<Ui::SettingsButton*> update) {
+	options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+	texts->fire(tr::ayu_SettingsUpdateAvailable(tr::now));
+	update->show();
+	downloading->fire(false);
+	const auto state = update->lifetime().make_state<AyuInstallState>();
+	state->download.progress(
+	) | rpl::on_next([=](Core::UpdateAssetDownload::Progress progress) {
+		const auto percent = (progress.size > 0)
+			? int(progress.already * 100 / progress.size)
+			: 0;
+		texts->fire(tr::lng_settings_downloading_update(
+			tr::now,
+			lt_progress,
+			QString::number(percent) + u"%"_q));
+	}, update->lifetime());
+	state->download.failed(
+	) | rpl::on_next([=] {
+		texts->fire(tr::lng_settings_update_fail(tr::now));
+		state->readyFile = QString();
+		update->setClickedCallback([=] {
+			UrlClickHandler::Open(info.url);
+		});
+	}, update->lifetime());
+	state->download.readyFile(
+	) | rpl::on_next([=](QString path) {
+		state->readyFile = path;
+		texts->fire(tr::lng_settings_update_ready(tr::now));
+		update->setClickedCallback([=] {
+			if (!Core::InstallDownloadedAsset(state->readyFile)) {
+				texts->fire(tr::lng_settings_update_fail(tr::now));
+				return;
+			}
+#ifdef Q_OS_WIN
+			Core::Quit();
+#else // Q_OS_WIN
+			texts->fire(tr::lng_settings_latest_installed(tr::now));
+			update->hide();
+#endif // Q_OS_WIN
+		});
+	}, update->lifetime());
+	update->setClickedCallback([=] {
+		if (state->download.active() || !state->readyFile.isEmpty()) {
+			return;
+		}
+		if (info.assetUrl.isEmpty()) {
+			UrlClickHandler::Open(info.url);
+			return;
+		}
+		state->download.start(
+			QUrl(info.assetUrl),
+			info.assetName.isEmpty() ? u"update.bin"_q : info.assetName);
+	});
+}
+
 void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 	if (!HasUpdate()) {
 		return;
@@ -1273,13 +1339,7 @@ void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 			Core::Restart();
 		});
 		checker.available() | rpl::on_next([=](Core::UpdateChecker::Available info) {
-			options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-			texts->fire(tr::ayu_SettingsUpdateAvailable(tr::now));
-			update->show();
-			update->setClickedCallback([=] {
-				UrlClickHandler::Open(info.url);
-			});
-			downloading->fire(false);
+			SetupAyuAssetInstall(info, options, texts, downloading, update);
 		}, options->lifetime());
 	}
 
@@ -1572,13 +1632,7 @@ void SetupUpdate(not_null<Ui::VerticalLayout*> container) {
 		SetDefaultStatus(checker, texts, downloading, update, version);
 
 		checker.available() | rpl::on_next([=](Core::UpdateChecker::Available info) {
-			options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-			texts->fire(tr::ayu_SettingsUpdateAvailable(tr::now));
-			update->show();
-			update->setClickedCallback([=] {
-				UrlClickHandler::Open(info.url);
-			});
-			downloading->fire(false);
+			SetupAyuAssetInstall(info, options, texts, downloading, update);
 		}, options->lifetime());
 
 	check->addClickHandler([] {
