@@ -115,7 +115,7 @@ jobs:
     - name: Build
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
-        cmake --build ..\out --config Release --parallel 1
+        cmake --build ..\out --config Release --parallel 2
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
