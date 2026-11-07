@@ -121,12 +121,12 @@ jobs:
     - name: Configure
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
-        call configure.bat x64 -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c -D CMAKE_CONFIGURATION_TYPES=Release -D CMAKE_DISABLE_PRECOMPILE_HEADERS=ON -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+        call configure.bat -G Ninja -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c -D CMAKE_BUILD_TYPE=Release -D CMAKE_DISABLE_PRECOMPILE_HEADERS=ON -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
     - name: Build
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
-        cmake --build ..\out --config Release --parallel 2 > ..\build_output.txt 2>&1
+        cmake --build ..\out --parallel 2 > ..\build_output.txt 2>&1
         set EXITCODE=%ERRORLEVEL%
         powershell -NoProfile -Command "Get-Content ..\build_output.txt -Tail 120"
         if not %EXITCODE%==0 exit /b %EXITCODE%
@@ -142,5 +142,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: AyuGram-Windows-x64
-        path: TBuild\AyuGramDesktop\out\Release\AyuGram.exe
+        path: TBuild\AyuGramDesktop\out\AyuGram.exe
         retention-days: 7
