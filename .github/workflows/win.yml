@@ -16,6 +16,18 @@ jobs:
       run:
         shell: cmd
     steps:
+    - name: Free disk space
+      shell: powershell
+      run: |
+        "Pre-clean free bytes: " + (Get-PSDrive C).Free
+        Remove-Item -Recurse -Force "C:\ProgramData\Android" -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force "C:\Program Files\Android" -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force "C:\Program Files (x86)\Android" -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force "$env:USERPROFILE\AppData\Local\Android" -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force "C:\ProgramData\DockerDesktop" -ErrorAction SilentlyContinue
+        docker system prune -af --volumes 2>$null
+        "Post-clean free bytes: " + (Get-PSDrive C).Free
+
     - name: Prepare directories
       run: |
         mkdir %GITHUB_WORKSPACE%\TBuild\Libraries\win64
