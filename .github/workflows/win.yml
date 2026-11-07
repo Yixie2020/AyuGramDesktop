@@ -127,12 +127,15 @@ jobs:
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
         cmake --build ..\out --config Release --parallel 2 > ..\build_output.txt 2>&1
+        set EXITCODE=%ERRORLEVEL%
+        powershell -NoProfile -Command "Get-Content ..\build_output.txt -Tail 120"
+        if not %EXITCODE%==0 exit /b %EXITCODE%
     - name: Upload build log
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: build-log
-        path: TBuild\out\build_output.txt
+        path: TBuild\AyuGramDesktop\build_output.txt
         retention-days: 7
 
     - name: Upload artifact
