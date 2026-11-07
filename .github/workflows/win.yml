@@ -121,7 +121,16 @@ jobs:
     - name: Configure
       run: |
         cd %GITHUB_WORKSPACE%\TBuild\AyuGramDesktop\Telegram
-        call configure.bat -G Ninja -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c -D CMAKE_BUILD_TYPE=Release -D CMAKE_DISABLE_PRECOMPILE_HEADERS=ON -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+        call configure.bat -G Ninja -D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c -D CMAKE_BUILD_TYPE=Release -D CMAKE_DISABLE_PRECOMPILE_HEADERS=ON -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Empty
+
+    - name: Grow pagefile for the final link
+      shell: pwsh
+      run: |
+        $cs = Get-CimInstance Win32_ComputerSystem
+        if ($cs.AutomaticManagedPagefile) { Set-CimInstance -InputObject $cs -Property @{AutomaticManagedPagefile=$false} }
+        $pf = Get-CimInstance Win32_PageFileSetting | Select-Object -First 1
+        Set-CimInstance -InputObject $pf -Property @{InitialSize=8192; MaximumSize=24576}
+        Get-CimInstance Win32_PageFileSetting | Format-List Name,InitialSize,MaximumSize
 
     - name: Build
       run: |
