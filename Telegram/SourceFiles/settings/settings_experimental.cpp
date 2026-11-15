@@ -71,7 +71,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 
 namespace Settings {
-namespace {
+namespace Internal {
 
 const auto kOptionsClipboardPrefix = u"tdesktop-flags:"_q;
 
@@ -164,6 +164,8 @@ struct ResolvedReferrer {
 		return u"ayu/wideMultiplier"_q;
 	}
 	return QString();
+}
+
 enum class ImportResult {
 	Done,
 	Invalid,
@@ -664,7 +666,9 @@ void SetupExperimental(
 	});
 }
 
-} // namespace
+} // namespace Internal
+
+using namespace Internal;
 
 Experimental::Experimental(
 	QWidget *parent,
