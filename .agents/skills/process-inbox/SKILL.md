@@ -60,11 +60,39 @@ write a proposed routing file inside the ignored transaction, but only the
 orchestrator writes tracked AI state.
 
 Treat natural-language hints as evidence, not required syntax. Segment the
-inbox into requests, then decide for each request whether to:
+inbox into requests, then put every task into a project: an existing one, or a
+new one when no existing project covers the area. There are no standalone
+tasks; publication refuses a new task without a live project.
 
+<<<<<<< HEAD
 - create a standalone task with no project;
 - add one or more tasks to an existing project;
 - create a new project when durable shared context is useful.
+=======
+A project is a bundle of tasks and the branch they are performed on, not a
+knowledge base. Its tasks run on a branch named by its slug, in tdesktop and
+in each top-level submodule it changes. The workflow switches a checkout onto
+that branch by itself, and every approval rebases the task's commits onto the
+shared branch and pushes them, so the owner integrates finished work one
+project branch at a time. Name a new project for the area its tasks touch, or
+for the kind of work when several requests share one, in one to three words
+such as `uploads`, `window-layout` or `code-health`, because the slug becomes
+a branch name. Existing projects keep their slugs. Plan a long or experimental
+project, such as a rewrite, as a task graph that can run for days: tasks that
+migrate one part each, differential tests against the old implementation, and
+`improve` tasks; the project planner extends it as results come in.
+
+Never create a task whose work is to move an existing source commit between
+branches: no backport, forward-port, cherry-pick, rebase, merge, branch sync,
+or equivalent integration task. Branch placement is human release/history
+coordination, not product work for the autonomous queue. When a request only
+asks for that operation, record a receipt-only disposition naming the existing
+source task or commit description and the requested target branch, then leave
+the operation to the human. When new product work requires code shipped by an
+earlier task, route only the product work and express the source task as a
+dependency; do not create a companion task to bring that dependency onto a
+branch.
+>>>>>>> v7.4.4
 
 Bias project assignment toward continuity. When a request follows from an
 existing task, begin with that task's project and keep it unless independence
@@ -72,23 +100,60 @@ is affirmatively established. A task belongs to the existing project when it
 builds on project code or behavior, requires source changes shipped by project
 tasks, assumes the project's branch or accumulated context, or must be ordered
 after project work. Touching shared infrastructure or an additional
-non-project consumer does not by itself make the task standalone: projects
+non-project consumer does not by itself move the task elsewhere: projects
 record feature and code lineage, not exclusive ownership of every touched
 file.
 
-Route a derived request to another project or to `project: null` only when it
-remains coherent, implementable, and independently testable in a checkout
-where the originating project's changes are absent or reverted. Record that
-concrete independence evidence in the receipt; "cross-cutting", "cleanup", or
-"broader than the source task" is not enough. For a request without a source
-task, prefer an existing project whenever its code, plan, or prior tasks supply
-essential context, and use a standalone task only when no project does.
+Route a derived request to another project only when it remains coherent,
+implementable, and independently testable in a checkout where the originating
+project's changes are absent or reverted. Record that concrete independence
+evidence in the receipt; "cross-cutting", "cleanup", or "broader than the
+source task" is not enough. For a request without a source task, choose the
+project of the area it touches: an existing project whose code, plan, prior
+tasks or slug cover that area, otherwise a new one.
 
+<<<<<<< HEAD
 Do not create generic holding projects such as `fixes`. A release batch of
 unrelated regressions normally becomes standalone tasks or tasks in existing
 domain projects. Group requests into one task only when they form one cohesive,
 independently testable behavior. Split work until every task is implementable
 in one pass and has an exact observable acceptance result.
+=======
+A release batch of unrelated regressions goes to the projects of the areas each
+fix touches, not to one catch-all such as `fixes` or `misc`. Group requests
+into one task only when they form one cohesive, independently testable
+behavior that can be implemented, reviewed, and tested as one normal pass.
+
+Split at product boundaries, not arbitrary file or line-count boundaries. A
+request needs multiple tasks when two or more parts have their own useful
+outcome and acceptance oracle, when a later part can consume an earlier part as
+a stable dependency, or when the parts require materially different context,
+failure analysis, or evidence setup. New network, persistence, concurrency or
+ownership machinery plus application lifecycle/UI integration are especially
+strong split signals when each can be exercised independently. Shared project
+context, overlapping files, or one eventual feature does not by itself justify
+paying one review and test loop over their combined implementation.
+
+Do not over-split inseparable changes: keep a small API and its only caller
+together when neither has a meaningful standalone result, and keep one atomic
+behavior together when separating it would leave an unbuildable or untestable
+intermediate state. For every proposed task, state the one shipped boundary it
+owns and the direct evidence that can approve it without first implementing a
+sibling. If that sentence needs several independent outcomes or several
+unrelated instruments, split again.
+
+This is the first scope gate, not an irrevocable ruling. Inbox planning uses the
+request plus light source inspection and deliberately does not construct the
+implementation plan. The later independent perform-task assessment sees exact
+files, APIs, phases, ownership boundaries, and evidence design; it may veto the
+single-task shape when that richer proof exposes independently shippable and
+testable boundaries. That veto does not mean task sizing is based on elapsed
+time or diff length, and it does not authorize the performer to mutate the
+queue itself. The performer publishes `split-required`; the checkout scheduler
+then launches a dedicated deep split transaction that creates replacements,
+rewrites dependencies and project links, and retires the source with a durable
+multi-target split record.
+>>>>>>> v7.4.4
 
 Project slugs are unique across `projects/` and `projects/archive/`. When a
 request belongs to an archived project, restore it before routing to it:
@@ -169,7 +234,7 @@ Create `state.yaml` in this exact field order:
 status: todo
 type: implement
 created: YYYY-MM-DD
-project: null
+project: <project-slug>
 depends_on: []
 claimed_by: null
 claimed_at: null
@@ -179,7 +244,16 @@ phase: null
 inbox_receipt: receipts/YYYY/MM/DD/<receipt>.md
 ```
 
+<<<<<<< HEAD
 Use a project slug instead of `null` when routed to a project. Use a YAML list
+=======
+Do not write a `model` field. It records which model finished the task, so only
+`finish` writes it, at the canonical `Approve`, `Block`, or `Split-required`
+boundary; a task
+carrying one before it is claimed is malformed.
+
+`project` is always a live project's slug. Use a YAML list
+>>>>>>> v7.4.4
 of task identifiers for dependencies. Dependencies record code lineage as well
 as readiness: keep an approved source task in `depends_on` when the new task's
 implementation assumes its shipped changes. State that prerequisite in
@@ -187,6 +261,7 @@ implementation assumes its shipped changes. State that prerequisite in
 `status: todo` with `claimed_by`, `claimed_at`, and `claim_order` set to `null`.
 The checkout tag belongs in the receipt only.
 
+<<<<<<< HEAD
 Inbox processing always writes `type: implement`. A human request is work to do,
 not a measurement of work already done. Only the `continue` scheduler's routing
 step creates `type: verify` tasks, when an approved result leaves an
@@ -199,6 +274,37 @@ For a new project, create `projects/<slug>/project.md` with a concise durable
 scope and `projects/<slug>/tasks.md` with task links. For an existing project,
 append every newly assigned task link, including inherited follow-ups. Project
 indexes do not store live status.
+=======
+Every new task uses `type: implement`. Do not predict a cheap or expensive
+execution profile while routing: the performer selects review specialists and
+evidence instruments after inspecting the real code and risks. Requests
+written by the code-health skill carry a `## Code health` section; keep it
+verbatim in the task, because its class selects the performer's lane, and
+never add one to any other request. A Q0, Q1 or Q2 request is already
+planned and sized: route it as one task of the `code-health` project with no
+dependencies, copy its title, paragraph and sections verbatim, and never
+merge or split it. Q3–Q5 requests are planned like any other. Keep acceptance
+criteria outcome-focused. Name a required build, probe, app run, interaction,
+or screenshot only when that instrument is itself part of the requested result
+or no other instrument could decide the claim from the facts already known to
+the planner.
+
+An exploratory request, one that asks to make something faster or smoother
+with no exact end result, gets an `## Objective` section in place of
+acceptance for that objective: the metric and which direction is better, the
+measurement protocol with its noise threshold, the guardrails, and optionally
+a target. The performer runs it in the improve lane
+(`.agents/skills/perform-task/references/improve-lane.md`); missing the target
+never blocks it. Hard requirements stay acceptance criteria.
+
+For a new project, create `projects/<slug>/project.md` with a `# ` title and
+one paragraph naming the area or kind of work it bundles, and
+`projects/<slug>/tasks.md` with task links. Nothing else belongs in a new
+`project.md`: each task carries its own context. For an existing project,
+append every newly assigned task link, including inherited follow-ups, with
+only concise optional grouping. Put routing and decision prose in task
+specifications or the receipt, following the shared policy.
+>>>>>>> v7.4.4
 
 Create one tracked Markdown receipt under `receipts/YYYY/MM/DD/`. Include:
 
@@ -217,8 +323,9 @@ receipt for finalization.
 Before committing, verify:
 
 - every request and supplied file is accounted for;
-- every new task has `task.md`, valid `state.yaml`, and a falsifiable
-  acceptance result;
+- every new task has `task.md`, valid `state.yaml`, a falsifiable
+  acceptance result, and a live project, created or restored in this
+  transaction when it is new or archived;
 - every task link, dependency, and copied input exists;
 - no task or project reference points into `projects/archive/`;
 - no raw inbox path, `.local/`, browser profile, portable account, credential,

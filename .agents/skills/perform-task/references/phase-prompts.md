@@ -102,11 +102,19 @@ Do not restate the full context, plan, diff, or long reasoning in the chat reply
 ## Artifact-Based Completion Checks
 
 - Phase 1 is complete only when `context.md` exists and is non-empty, `plan.md`
+<<<<<<< HEAD
   exists and contains a `## Status` section, and no unintended source edits
   were made. For a project task, `project.proposed.md` must also exist and be
   non-empty. For a `Visual: layout` task, `visual.md` must also satisfy the
   visual design completion check below.
 - Phase 3 is complete only when `plan.md` contains both `Phases:` in the Status section and `Assessed: yes`, or records a rejection outcome (`Fast-Path: rejected` or `Approach: rejected`) that sends the performer back to a fresh Phase 1 leaf.
+=======
+  exists, records `Code: harness` or `Code: product`, and contains a
+  `## Status` section, and no unintended source edits were made. For a
+  `Visual: layout` task,
+  `visual.md` must also satisfy the visual design completion check below.
+- Phase 3 is complete only when `plan.md` contains both `Phases:` in the Status section and `Assessed: yes`, records a rejection outcome (`Fast-Path: rejected` or `Approach: rejected`) that sends the performer back to a fresh Phase 1 leaf, or records `Scope: split-required` and has a complete `split-proposal.md` that stops source work for queue rescoping.
+>>>>>>> v7.4.4
 - Phase 4 is complete only when the target phase checkbox changed to checked and the touched-file list matches the owned write set, or the blocker explains any mismatch.
 - Phase 5 is complete only when the build outcome is known and the build checkbox is updated on success.
 - Phase 6a is complete only when every lens scheduled for iteration `R` wrote `review<R>-<lens>.md` with a `## Verdict:` line and a non-empty `## Checked` section. A lens report that records no checked surfaces is incomplete work: rerun that lens rather than accepting it.
@@ -149,8 +157,15 @@ YOUR JOB: Read AGENTS.md, inspect the codebase, find all files and code relevant
 
 Steps:
 1. Read AGENTS.md for project conventions and build instructions.
+<<<<<<< HEAD
 2. When `<PROJECT_FILE>` is not `none`, read it as the current durable project
    blueprint and preserve everything still accurate in the proposal.
+=======
+2. Read `.agents/shared/project-context.md` in the source checkout. When
+   `<PROJECT_FILE>` is not `none`, read its title and first paragraph to know
+   the area; expand only concretely relevant dependencies and references under
+   that policy. Current task requirements and source govern the plan.
+>>>>>>> v7.4.4
 3. Search the codebase for files, classes, functions, and patterns related to the task.
 4. Read all potentially relevant files. Be thorough and prefer reading more rather than less.
 5. For each relevant file, note:
@@ -163,6 +178,7 @@ Steps:
 8. Check .style files if the task involves UI.
 9. Check lang.strings if the task involves user-visible text.
 
+<<<<<<< HEAD
 Write `<WORK_DIR>/project.proposed.md` only when `<PROJECT_FILE>` is not
 `none`. It is not used by the current task. Describe the project as if this
 task is approved and fully working, so the performer can promote it only after
@@ -173,6 +189,9 @@ approval. Include:
 - Relevant Codebase Areas: Which parts of the codebase this project touches, key types and APIs involved
 
 Do not include temporal state like "Current State", "Pending Changes", "Not yet implemented", or "TODO". Describe the project as a complete, coherent whole.
+=======
+Never modify `<PROJECT_FILE>`.
+>>>>>>> v7.4.4
 
 Always write `<WORK_DIR>/context.md`.
 

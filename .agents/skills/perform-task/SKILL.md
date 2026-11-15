@@ -63,6 +63,30 @@ Inspect the resolved task, readiness, `other_active_task`, status, and owner.
 - If it is owned by another checkout, stop. Cross-checkout restart is a rare
   explicit human reassignment, never an implicit steal.
 - If its dependencies are unfinished, report them and stop without starting.
+<<<<<<< HEAD
+=======
+- Every task runs on its project's branch, and `start` and `retry` refuse
+  any other. The owner never switches branches by hand: before a `start`, a
+  `retry`, or resuming an `in-progress` task, run
+  `workspace.py project-switch --project <slug> --task <full-task-id>` with
+  the task's `--require` arguments, as
+  [Switch to the project branch](../continue/SKILL.md#switch-to-the-project-branch)
+  describes, unless a `continue` scheduler already did for this task. It
+  publishes the branch being left, lines the project branch up with
+  `private/<slug>` or starts it from `private/alpha`, and rebases a branch
+  that skipped a release or lacks the task's prerequisites. When it refuses
+  uncommitted changes of unknown origin, ask the owner what to do with them:
+  in an interactive invocation ask directly, in a `continue` delegation
+  return the refusal so the scheduler asks. A legacy task without a project
+  runs on any branch that is not a live project's, as before.
+- Inspect `task.md` for approved source-task prerequisites in addition to
+  `depends_on`. A task that is already `in-progress` resumes as it is; its
+  work meets newer project commits at `project-sync`. Then
+  run `workspace.py source-lineage --task <full-task-id>`
+  with one `--require <source-task-id>` for each explicit prerequisite. Require
+  `current_satisfies: true` before Phase 1. For `start` or `retry`, pass the same
+  `--require` arguments so claiming is machine-gated too.
+>>>>>>> v7.4.4
 - If it is `todo` and either unclaimed or owned by this checkout, atomically
   assign and activate it:
 
@@ -121,6 +145,7 @@ next run more manual and closer to the changed production seam. The configured
 test-run cap is the safety boundary; the former two-identical-signature shortcut
 must not be used.
 
+<<<<<<< HEAD
 A locked macOS session is not an environment stop or verification blocker.
 Skip interactive Computer Use and complete the same coverage through the
 in-binary overlay: drive the flow, log/assert, capture widgets or windows,
@@ -130,6 +155,75 @@ A Windows build-output lock is not an immediate environment stop. Follow the
 shared bounded recovery contract, including exact-path cleanup before builds.
 Only its exhausted or unsafe outcome is a global hard stop; it never becomes a
 task `Block`.
+=======
+The review loop runs until the reviewers agree, with no round limit and no
+human stop. At the fifth verdict that needs changes, at each later checkpoint,
+or when the loop cycles or a fix outgrows the plan, the pipeline's independent
+convergence assessment diagnoses it instead of another ordinary fix. It
+continues the loop with rulings that settle reopened questions, replans the
+failing mechanism, or chooses `RESCOPE_REQUIRED`; unresolved findings are never
+approved to end the loop. A task whose
+desired outcome was already present may finish without a source commit only
+after the same general review and evidence loop prove
+`Outcome: already-satisfied`.
+
+Every task syncs its work onto the shared project branch and pushes it before
+its `Approve`, as `pipeline.md` "Project branches" describes; several
+checkouts may be working on the same project.
+
+Only a genuine exhausted task blocker produces a
+canonical `Block <full-task-id>` commit. In a `continue` run a `Block` sets
+the task aside: the scheduler's project planner routes around it and the run
+goes on. Agent interruption and tool loss leave the task `in-progress` with
+its task-scoped local state intact for the next invocation.
+
+Never wait on the owner. A `continue` run often has nobody at the computer,
+so the performer and its leaves never ask the owner a question. Decide from
+the task, the project description and repository precedent, prefer existing
+behavior, record the question, the choice and the alternatives in
+`work/decisions.md`, and continue. The owner reviews decisions afterwards;
+overturning one becomes a new task. The one question asked before a task
+starts is what to do with uncommitted source of unknown origin.
+
+A repeated evidence setup failure is not exhausted recovery by itself. Follow
+the shared directness ladder: forbid the failed command, fixture, probe, or
+capture technique and make the next run closer to the changed surface. The configured
+test-run cap closes one campaign: preserve prior passes, isolate the unmet
+checks, and start a focused recovery campaign only when a fresh cap
+assessment names a direct strategy not yet tried; each further campaign needs
+another such assessment. When none remains, the assessment records recovery
+exhaustion, and the task is split, moved to the improve lane for a threshold
+the code cannot meet, or set aside with a `Block`. Nobody waits for the
+owner. A cap and a `TEST_FLAW` can never by themselves publish `BLOCKED` or
+approval.
+
+A pre-Runner crash or DeadlockDetector event is not an evidence setup failure merely
+because the scenario did not start. Apply the shared crash diagnostics and debugger
+fallback before changing an account fixture. An empty or unusable dump requires live
+debugging after at most one confirmation run; it never supports a fixture verdict.
+
+A locked macOS session is not an environment stop or evidence blocker for a
+selected Telegram runtime check. Skip interactive Computer Use and complete
+the same coverage through the in-binary overlay: drive the flow, log/assert,
+capture widgets or windows, quit, and assess the saved artifacts. Non-app
+instruments are unaffected.
+
+A Windows build-output lock is not an immediate environment stop. Follow the
+shared bounded recovery contract, including exact-path cleanup before builds
+and its delayed retries. Only its exhausted or unsafe outcome stops the run;
+it never becomes a task `Block`.
+
+The global stops that remain are a server scheme mismatch (the server rejects
+the client's constructors, for example `INPUT_CONSTRUCTOR_INVALID`, or answers
+with constructors the client cannot parse: the owner must update the scheme)
+and a missing golden test account that cannot be recreated unattended. Dirty
+source the run cannot account for, once the task has started, is never a
+reason to stop: save it with
+`workspace.py wip-save --reason "<what is unknown>"`, which commits it to a
+new side branch `wip/<branch>/<checkout-tag>/<time>` (tdesktop on `private`,
+submodules on their `origin`) and leaves the checkout clean, name that branch
+in the result, and continue.
+>>>>>>> v7.4.4
 
 Do not report success from a source commit alone. The final AI commit must be
 canonical. Retry ordinary concurrent-master publication races until success.

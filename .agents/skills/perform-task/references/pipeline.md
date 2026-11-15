@@ -21,6 +21,13 @@ stateful runner. Treat the external `task.md`, its referenced inputs, project
 context, and repository as sufficient unless the request expressly requires
 unavailable exact bytes or content.
 
+<<<<<<< HEAD
+=======
+Use the shared [project-context policy](../../../shared/project-context.md)
+for selective reading and task-specific context. A task never edits its
+project's `project.md`.
+
+>>>>>>> v7.4.4
 Use visual evidence in this order: explicit task facts; supplied inputs;
 adjacent current UI/code/styles and the pre-task baseline; repository history
 and legacy implementations; then the closest established desktop convention
@@ -38,8 +45,12 @@ TASK_DIR = AI_SLOT/tasks/TASK_ID
 WORK_DIR = TASK_DIR/work
 LOCAL_DIR = TASK_DIR/.local
 TASK_SPEC = TASK_DIR/task.md plus referenced TASK_DIR/input files
+<<<<<<< HEAD
 PROJECT_FILE = AI_SLOT/projects/<project>/project.md, or none
 PREVIOUS_CONTEXT = latest approved project task's work/context.md, or none
+=======
+PROJECT_FILE = AI_SLOT/projects/<project>/project.md, or none for a legacy task without a project
+>>>>>>> v7.4.4
 BASE_REF = refs/ai-tasks/TASK_ID/base
 GREEN_REF = refs/ai-tasks/TASK_ID/green
 RUN_REF = refs/ai-tasks/TASK_ID/run
@@ -123,7 +134,10 @@ Use tracked, resumable task artifacts:
 
 ```text
 work/context.md
+<<<<<<< HEAD
 work/project.proposed.md       # project tasks only
+=======
+>>>>>>> v7.4.4
 work/visual.md                 # layout tasks only
 work/plan.md
 work/review1-correctness.md    # one report per review lens per iteration
@@ -161,8 +175,15 @@ repeat an approved phase merely because the prior agent session disappeared.
 Treat a compact subagent reply as a notification; the artifact and repository
 state are proof.
 
+<<<<<<< HEAD
 At each stable boundary update `work/progress.md` and record the current phase
 locally:
+=======
+Apply the shared policy on resume too: a legacy project proposal or amendment
+is not a completion requirement and is never applied.
+
+At each stable boundary record the current phase locally:
+>>>>>>> v7.4.4
 
 ```bash
 python3 SOURCE_ROOT/.agents/skills/process-inbox/scripts/workspace.py \
@@ -223,11 +244,18 @@ Run sequentially:
 1. **Context, visual design, and plan.** One leaf writes a self-contained
    `work/context.md`, then — for `Visual: layout` tasks — `work/visual.md`,
    then `work/plan.md` with exact files, functions, ordered steps, bounded
+<<<<<<< HEAD
    phases, owned write sets, Debug build verification, and status checkboxes.
    For project work it also writes `work/project.proposed.md` as a coherent
    finished-state blueprint; use the Phase 1F prompt when prior task context
    exists, otherwise Phase 1 with the project file. Do not promote the
    proposal yet; blocked work must not become project truth.
+=======
+   phases, owned write sets, adaptive review/evidence plans, the selected
+   pre-review validation, and status checkboxes.
+   Use the same Phase 1 prompt for new and follow-up work, with the project's
+   paragraph and explicitly relevant references.
+>>>>>>> v7.4.4
    The visual contract derives every dimension from request relationships,
    supplied images, font metrics, style tokens, sibling geometry, or a cited
    desktop analogue, with ordered calculations, tolerances, relationship
@@ -588,7 +616,78 @@ executable. The marked live test copy stays in place per the test-loop folder
 rules. For implementation-blocked work with no
 retained commit, restore only proven owned paths to `BASE_REF`. For test-blocked
 work retain the latest implementation commit and state the exact unverified
+<<<<<<< HEAD
 behavior.
+=======
+behavior. `Blocker-Type: test` additionally requires `work/test.md` to contain
+`## Recovery exhaustion`, unless the verdict is the separately documented
+Computer Use infrastructure-unavailable case. A `TEST_FLAW`, a run cap, or a
+missing capture can never be the blocked verdict.
+
+For `split-required`, do not clean, reset, stash, or checkpoint retained source
+implementation. Require current task base/run refs, keep the owned diff and any
+green commit in place, and inventory every owned path in `work/owned-paths.txt`.
+The publication helper seals that work in `work/carried-work.json`; the later
+split transaction rechecks the seal before assigning an implementation carrier.
+
+### Project branches
+
+Every task belongs to a project, and every project is performed on the branch
+named by its slug, in tdesktop and in each top-level submodule the project
+changes; several checkouts may work on one project at once. The scheduler, or
+`perform-task` itself, ran `project-switch` before the task started, so the
+checkout is already on that branch. When that switch rebased the branch onto
+a new base (`base_refresh`, or `Rebased onto:` from the scheduler), the
+first Debug build after Phase 1 may expose breakage the rebase brought in:
+fix it in its own commit, with this task's trailer and a plain
+`Fix build after rebasing onto <base>.`-style subject, before the task's own
+changes. A nested submodule's commit must already
+be on one of its remote branches; `project-push` refuses otherwise. Every
+approval pushes: before publishing a task's `Approve` (a legacy task without a
+project skips these steps):
+
+1. Run `workspace.py project-sync --task <TASK_ID>`, adding
+   `--onto <remote>/<branch>` when the scheduler passed `Base:` for this task.
+   It fetches `private`, replays only this task's own commits onto
+   `private/<slug>`, rebases the task's submodule commits onto each
+   submodule's `<slug>` branch and rewrites their pins, and refreshes
+   `BASE_REF`, `GREEN_REF` and `RUN_REF`. With `--onto` it then rebases the
+   whole project branch onto that base, its submodule commits onto the
+   commits the base pins. A replay conflict leaves the checkout as it was;
+   resolve it by reading both sides' intent, as the `/rebase` skill does,
+   then run `project-sync` again.
+2. When it reports `build_required`, build Debug. Nothing is rebuilt
+   otherwise. A failure in the project's own code is fixed by amending the
+   commit that introduced it: this task's commits after an ordinary sync, any
+   project commit after a base rebase. Use `git commit --fixup` and a
+   non-interactive autosquash rebase, then `source-begin` to refresh the
+   task refs. A failure in the base's own code, which does not build by
+   itself, is fixed in one new commit with a plain `Fix build.`-style subject
+   that touches only files no project commit changes; run `source-begin` so
+   the task refs include it, then
+   `project-sync --onto <base> --base-fix <commit>`, which moves it first on
+   the branch, directly on the base, and reports it as `base_fix`. When a sync
+   reports `rewrite_discarded`, another checkout published first and the base
+   rebase was undone: redo it with `--onto`, and redo its build fixes.
+3. Run `workspace.py project-push --task <TASK_ID>`, with `--rewritten` after
+   a base rebase, and `--base-fix <base_fix> --base <remote>/<branch>` when a
+   base fix exists: that fix is fast-forwarded onto the base branch first.
+   Submodule branches are pushed before tdesktop. After a base rebase the
+   new submodule commits go first to this checkout's own staging branch
+   `_staging/<slug>/<checkout-tag>`, so every pin is fetchable, then tdesktop
+   moves under its lease, then the submodule project branches; if one of
+   those fails, rerun `project-push` until it completes. A rejected push
+   means another checkout published first: go back to step 1.
+4. Only then run `finish`.
+
+A task that is set aside with `Block` publishes nothing to the
+project branch. After its `Block` is published, keep each changed
+submodule's pinned commit with
+`git -C <submodule> update-ref refs/ai-tasks/<TASK_ID>/green <pin>`, then
+reset the branch to `BASE_REF` (`GREEN_REF` keeps the tdesktop commits) and
+update the submodules, so the next task starts clean. A retry first replays `BASE_REF..GREEN_REF` onto the
+current tip with `git cherry-pick`, then runs `source-begin`.
+>>>>>>> v7.4.4
 
 Write `work/result.md` with exactly one value for every field:
 
@@ -618,6 +717,7 @@ all enforced by `finish`:
 Finding: confirmed | deviation | inconclusive
 ```
 
+<<<<<<< HEAD
 `Touched:` is always `none`. `Finding: deviation` requires `Discovered: present`,
 because a measured disagreement that routes no repair is how a known defect
 becomes invisible. `Finding: inconclusive` is the only finding a blocked
@@ -629,6 +729,9 @@ as a summary judgement.
 For approved project work, promote `work/project.proposed.md` to the project's
 `project.md` immediately before final AI publication. For blocked work, retain
 the proposal only as a task artifact.
+=======
+Every result leaves shared project files unchanged.
+>>>>>>> v7.4.4
 
 Publish final AI state only after the Telegram commit and result are final:
 
@@ -701,8 +804,19 @@ delays finishing the work actually in hand.
   starting new shared work. A dirty/non-buildable checkout or global
   environment problem stops the current invocation.
 - A Windows file-lock build error follows the shared bounded exact-checkout
+<<<<<<< HEAD
   recovery. Only exhaustion or an unsafe/non-owned holder stops the run and
   asks the human; the task remains `in-progress`.
+=======
+  recovery, including its delayed retries. Only its exhausted or unsafe outcome
+  stops the run; the task remains `in-progress`.
+- Never ask the owner during a `continue` run. Decide, record the decision in
+  `work/decisions.md`, and continue. The only global stops are a server scheme
+  mismatch and a missing golden test account; unexplained dirty source that
+  appears during the run goes to `workspace.py wip-save` instead. Uncommitted
+  source of unknown origin found before the task starts is the owner's
+  question, asked by whoever starts the task.
+>>>>>>> v7.4.4
 - A locked macOS session and the resulting unavailable Computer Use driver
   never stop or block the task; continue with the complete in-binary overlay
   flow.
